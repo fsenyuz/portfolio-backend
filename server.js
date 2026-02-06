@@ -40,7 +40,19 @@ function logUsage(ip, model, status) {
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
 // --- 4. GEMINI KURULUMU (YENİ SDK) ---
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// KRİTİK: apiVersion: 'v1' ekleyerek stable endpoint'e geçiyoruz (hataları çözer)
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, apiVersion: 'v1' });
+
+// Startup'ta mevcut modelleri logla (Render log'larında gör)
+async function logAvailableModels() {
+    try {
+        const models = await genAI.listModels();
+        console.log('📋 Mevcut Modeller:', models.models.map(m => m.name));
+    } catch (err) {
+        console.error('🚨 Modelleri Listeleme Hatası:', err.message);
+    }
+}
+logAvailableModels();
 
 // --- 5. PERSONA (DİVİNE ASSISTANT KİMLİĞİ) ---
 const SYSTEM_INSTRUCTION_TEXT = `
@@ -65,17 +77,19 @@ Be helpful, professional, slightly witty. Answer in the language the user speaks
 `;
 
 // --- 6. MODEL LİSTESİ (FALLBACK MECHANISM - 2026 GÜNCEL) ---
+// Stable modellere odaklan: 2.5 serisi başa, preview sona (overloaded riski düşük)
 const MODELS = [
-    "gemini-2.5-flash",          // Ana Hedef: En hızlı ve multimodal
-    "gemini-2.5-flash-lite",     // Senin istediğin Lite varyant (Ekonomik/Hızlı)
-    "gemini-3-flash-preview",    // Yeni nesil preview (Gelecek kanıtı)
-    "gemini-1.5-flash"           // Son Kale: Her zaman çalışan stabil model
+    "gemini-2.5-flash",          // Ana: Hızlı, multimodal
+    "gemini-2.5-flash-lite",     // Lite: Ekonomik
+    "gemini-2.5-pro",            // Pro: Karmaşık sorgular için
+    "gemini-3-flash-preview",    // Preview: Yeni nesil (ama overloaded olabilir)
+    "gemini-1.5-flash"           // Fallback: Stabil eski model
 ];
 
 // Health Check (Versiyon kontrolü eklendi)
 app.get('/', (req, res) => res.json({ 
     status: "Divine AI Online", 
-    version: "2026.02-final", 
+    version: "2026.02-fix", 
     models: MODELS 
 }));
 
@@ -130,7 +144,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             try {
                 console.log(`🤖 Model deneniyor: ${modelName}`);
 
-                // YENİ SDK SYNTAX
+                // YENİ SDK SYNTAX (Overload için temperature düşürüldü)
                 const result = await genAI.models.generateContent({
                     model: modelName,
                     contents: [{ role: 'user', parts: parts }],
@@ -138,12 +152,12 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                         systemInstruction: {
                             parts: [{ text: SYSTEM_INSTRUCTION_TEXT }]
                         },
-                        temperature: 0.7,
-                        maxOutputTokens: 1000
+                        temperature: 0.5,  // Düşürüldü: Daha stabil cevaplar
+                        maxOutputTokens: 500  // Azaltıldı: Overload riskini düşür
                     }
                 });
 
-                // ROBUST CEVAP ÇIKARMA (Grok'un Önerisi)
+                // ROBUST CEVAP ÇIKARMA
                 let responseText = '';
                 if (typeof result.text === 'function') {
                     responseText = result.text();
