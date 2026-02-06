@@ -40,18 +40,8 @@ function logUsage(ip, model, status) {
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
 // --- 4. GEMINI KURULUMU (YENİ SDK) ---
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-// Startup'ta mevcut modelleri logla (Render log'larında gör)
-async function logAvailableModels() {
-    try {
-        const models = await genAI.listModels();
-        console.log('📋 Mevcut Modeller:', models.models.map(m => m.name));
-    } catch (err) {
-        console.error('🚨 Modelleri Listeleme Hatası:', err.message);
-    }
-}
-logAvailableModels();
+// KRİTİK: apiVersion 'v1' olarak ayarlandı (v1beta hatalarını çözer)
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, apiVersion: 'v1' });
 
 // --- 5. PERSONA (DİVİNE ASSISTANT KİMLİĞİ) ---
 const SYSTEM_INSTRUCTION_TEXT = `
@@ -75,24 +65,21 @@ MANDATORY RESPONSE STYLE:
 Be helpful, professional, slightly witty. Answer in the language the user speaks (Turkish or English).
 `;
 
-// --- 6. MODEL LİSTESİ (FALLBACK MECHANISM - SENİN ERİŞİMİNE GÖRE GÜNCEL) ---
-// Ekran görüntüsüne göre: Başa erişilebilir flash/lite koy, Gemma'ları fallback olarak ekle (hafif ve ücretsiz)
+// --- 6. MODEL LİSTESİ (FALLBACK MECHANISM - SENİN AI STUDIO ERİŞİMİNE GÖRE MİNİMİZE) ---
+// Başa çalışan modeller: Gemini 3 Flash, 2.5 Flash, 2.5 Flash Lite. Diğerleri fallback.
 const MODELS = [
-    "gemini-3-flash",            // Senin listende: Gemini 3 Flash (yeni ve güçlü)
-    "gemini-2.5-flash",          // Gemini 2.5 Flash (hızlı)
-    "gemini-2.5-flash-lite",     // Gemini 2.5 Flash Lite (ekonomik)
-    "gemini-2.5-flash-tts",      // TTS varyantı (eğer metin tabanlıysa dener)
-    "gemini-robotics-er-1.5-preview", // Robotics preview (genel amaçlı dener)
+    "gemini-3-flash",            // Senin listende Gemini 3 Flash (çalışmalı)
+    "gemini-2.5-flash",          // Gemini 2.5 Flash
+    "gemini-2.5-flash-lite",     // Gemini 2.5 Flash Lite
+    "gemini-2.5-flash-tts",      // TTS varyantı (metin için dener)
     "gemma-3-27b",               // Gemma 3 27B (açık kaynak fallback)
-    "gemma-3-12b",               // Daha hafif Gemma
-    "gemma-3-4b",                // En hafif fallback
-    "gemini-embedding-1"         // Embedding (eğer metinse dener, ama chat için son)
+    "gemma-3-12b"                // Hafif Gemma fallback
 ];
 
 // Health Check (Versiyon kontrolü eklendi)
 app.get('/', (req, res) => res.json({ 
     status: "Divine AI Online", 
-    version: "2026.02-final-fix", 
+    version: "2026.02-final-fix2", 
     models: MODELS 
 }));
 
@@ -110,9 +97,9 @@ app.post('/chat', upload.single('image'), async (req, res) => {
         // Mesajı Temizle
         const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
         
-        // Prompt Parçalarını Oluştur
-        const parts = [];
-        if (userMsg) parts.push({ text: userMsg });
+        // Prompt Parçalarını Oluştur (System instruction'ı user prompt'una enjekte et - role destek sorunu için)
+        const combinedPrompt = SYSTEM_INSTRUCTION_TEXT + "\n\nUser Message: " + userMsg;
+        const parts = [{ text: combinedPrompt }];
 
         // Resim İşleme
         if (req.file) {
@@ -147,16 +134,13 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             try {
                 console.log(`🤖 Model deneniyor: ${modelName}`);
 
-                // YENİ SDK SYNTAX: systemInstruction contents array'ine eklendi
+                // YENİ SDK SYNTAX: Sadece user role, system enjekte edildi (hataları çözer)
                 const result = await genAI.models.generateContent({
                     model: modelName,
-                    contents: [
-                        { role: 'system', parts: [{ text: SYSTEM_INSTRUCTION_TEXT }] },
-                        { role: 'user', parts: parts }
-                    ],
-                    generationConfig: {  // Config -> generationConfig olarak değiştirildi
-                        temperature: 0.5,  // Düşürüldü: Stabilite için
-                        maxOutputTokens: 500  // Azaltıldı: Overload riskini düşür
+                    contents: [{ role: 'user', parts: parts }],
+                    generationConfig: {
+                        temperature: 0.5,  // Düşük: Stabilite
+                        maxOutputTokens: 500  // Düşük: Rate limit için
                     }
                 });
 
