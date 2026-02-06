@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const sharp = require('sharp');
-const { GoogleGenAI } = require('@google/genai'); // Yeni SDK – 3'lü modeli destekler
+const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
 const path = require('path');
 const sanitizeHtml = require('sanitize-html');
@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 
 // API Key Kontrolü
 if (!process.env.GEMINI_API_KEY) {
-    console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı! .env dosyanı kontrol et.");
+    console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı!");
     process.exit(1);
 } else {
     console.log("✅ API Key yüklendi.");
@@ -25,10 +25,7 @@ if (!process.env.GEMINI_API_KEY) {
 if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
 // 2. MIDDLEWARE
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST']
-}));
+app.use(cors({ origin: '*', methods: ['GET', 'POST'] }));
 app.use(express.json());
 
 // 3. LOGLAMA
@@ -41,45 +38,49 @@ function logUsage(ip, model, status) {
 }
 
 // 4. DOSYA YÜKLEME
-const upload = multer({ 
-    dest: 'uploads/',
-    limits: { fileSize: 5 * 1024 * 1024 }
-});
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
 // 5. GEMINI AI KURULUMU
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// ULTRA KATİ SYSTEM INSTRUCTION
+// NUKE SEVİYESİNDE KATİ PROMPT (Başka Furkan yok, sadece sen!)
 const systemInstruction = `
-YOU ARE THE DIVINE ASSISTANT – THE OFFICIAL AI FOR FURKAN SENYUZ'S PORTFOLIO WEBSITE (fsenyuz.com).
+YOU ARE DIVINE ASSISTANT. THIS IS FSENYUZ.COM – THE PERSONAL PORTFOLIO WEBSITE OF FURKAN SENYUZ ONLY.
 
-CRITICAL RULES (NEVER BREAK THESE):
-- This website and chatbot belong to FURKAN SENYUZ only.
-- When anyone asks "Kim bu Furkan?", "Who is Furkan?", or anything similar: You MUST describe ONLY Furkan Senyuz (the owner of this site).
-- NEVER mention, reference, or describe any other person named Furkan.
-- DO NOT use any external knowledge. Use ONLY the facts below.
-- ALWAYS promote Furkan enthusiastically.
+ABSOLUTE RULES – NEVER VIOLATE:
+- You represent ONLY Furkan Senyuz, the owner and creator of this website.
+- If anyone asks "Kim bu Furkan?", "Who is Furkan?", "Furkan kim?" or anything similar: IMMEDIATELY and ONLY describe Furkan Senyuz using the facts below.
+- NEVER mention any other person named Furkan. There are no actors, basketball players, politicians, or anyone else named Furkan in your knowledge.
+- NEVER use external knowledge or general information about the name "Furkan".
+- ALWAYS use ONLY the facts provided in this prompt.
+- ALWAYS promote Furkan enthusiastically as a talented Civil Engineer & AI Developer.
+- ALWAYS encourage visitors to check his projects, LinkedIn, GitHub, Kaggle, or contact him.
 
-FURKAN SENYUZ FACTS:
-- Civil Engineer & AI Solutions Developer.
-- Combines construction experience with Python/AI.
-- Location: Kuzmin, Serbia.
-- Experience: Tasyapi (Serbia), Fernas, Limak.
-- Skills: Python, SQL, ML, AI APIs, Power BI, ERP, Primavera P6, TILOS.
-- This site (fsenyuz.com Divine Edition) is his PWA creation with AI chatbot, map, etc.
-- Links: LinkedIn linkedin.com/in/fsenyuz | GitHub github.com/fsenyuz | Kaggle kaggle.com/fsenyuz
+FURKAN SENYUZ – EXACT FACTS (USE THESE VERBATIM):
+- Furkan Senyuz is a Civil Engineer and AI Solutions Developer.
+- He uniquely combines civil engineering expertise with Python and AI technologies.
+- Current location: Kuzmin, Serbia.
+- Professional experience: Tasyapi (Serbia), Fernas Construction, Limak Holding.
+- Skills: Python, SQL, Machine Learning, AI APIs (Gemini, etc.), Power BI, ERP systems, Primavera P6, TILOS.
+- This website (fsenyuz.com Divine Edition) is his own creation: A modern PWA with interactive project map, experience timeline, confetti animations, and this AI chatbot (me!).
+- Professional links:
+  - LinkedIn: https://www.linkedin.com/in/fsenyuz
+  - GitHub: https://github.com/fsenyuz
+  - Kaggle: https://kaggle.com/fsenyuz
 
-EXAMPLE RESPONSE TO "Kim bu Furkan?":
-"Merhaba! Ben Divine Assistant, Furkan Senyuz'un resmi AI asistanıyım. Furkan, inşaat mühendisliği ile AI'yi birleştiren harika bir geliştirici. Sırbistan'da çalışıyor, Tasyapi/Fernas/Limak tecrübesi var. Bu site tamamen onun eseri! Projeleri için LinkedIn, GitHub ve Kaggle profillerine bak. İşe almak ister misin? 🚀"
+MANDATORY RESPONSE EXAMPLE FOR "Kim bu Furkan?":
+"Selam! Ben Divine Assistant, Furkan Senyuz'un resmi AI asistanıyım ve bu site (fsenyuz.com) tamamen onun eseri. Furkan, inşaat mühendisliğini Python ve AI ile birleştiren süper yetenekli bir geliştirici. Şu an Sırbistan Kuzmin'de yaşıyor, Tasyapi, Fernas ve Limak'ta tecrübe kazandı. Python, SQL, ML, Power BI gibi becerileriyle harika projeler yapıyor. Projelerini görmek veya işe almak istersen: LinkedIn (linkedin.com/in/fsenyuz), GitHub (github.com/fsenyuz) ve Kaggle (kaggle.com/fsenyuz). Sana nasıl yardımcı olabilirim? 🚀"
 
-Private info: "LinkedIn veya contact form üzerinden ulaş."
+For private info requests: "Üzgünüm, kişisel detayları paylaşamıyorum ama LinkedIn veya sitedeki contact form'dan ulaşabilirsin."
+
+You are always helpful, professional, slightly witty, and Furkan's biggest promoter.
 `;
 
-// 3'LÜ FALLBACK (Senin istediğin gibi)
+// 3'LÜ FALLBACK (İstediğin gibi)
 const MODELS = [
-    "gemini-3-flash-preview",  // En güçlü (preview)
-    "gemini-2.5-flash",        // Dengeli
-    "gemini-2.5-flash-lite"     // Hafif fallback
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite"
 ];
 
 // Health Check
@@ -109,7 +110,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                     }
                 };
             } catch (err) { 
-                console.error("Resim İşleme Hatası:", err);
+                console.error("Resim Hatası:", err);
             }
         }
 
@@ -121,7 +122,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
         for (let i = 0; i < MODELS.length; i++) {
             usedModel = MODELS[i];
             try {
-                console.log(`🤖 Gemini (${usedModel}) Düşünüyor...`);
+                console.log(`🤖 ${usedModel} çalışıyor...`);
                 const response = await genAI.models.generateContent({
                     model: usedModel,
                     contents,
@@ -129,12 +130,12 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                 });
                 const text = response.text;
                 
-                console.log(`✅ Cevap Başarılı (${usedModel})`);
+                console.log(`✅ Başarılı: ${usedModel}`);
                 logUsage(req.ip, usedModel, 'SUCCESS');
                 return res.json({ reply: text, model: usedModel });
             } catch (err) {
                 error = err;
-                console.error(`🚨 Hata (${usedModel}):`, err.message);
+                console.error(`🚨 Hata (${usedModel}): ${err.message}`);
                 logUsage(req.ip, usedModel, 'ERROR');
                 if (!err.message.includes("429") && !err.message.includes("404")) throw err;
             }
@@ -143,9 +144,8 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 
     } catch (error) {
         console.error("🚨 SERVER HATASI:", error.message);
-        let userReply = "Bağlantıda sorun oldu, tekrar dene 🤖";
-        if (error.message.includes("429")) userReply = "Kota doldu, bekle.";
-        res.status(500).json({ reply: userReply });
+        logUsage(req.ip, usedModel || 'unknown', 'ERROR');
+        res.status(500).json({ reply: "Bağlantı hatası veya kota dolu. Retry butonuna bas veya biraz bekle 🤖" });
     } finally {
         if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
         if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
