@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const sharp = require('sharp');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');  // Yeni SDK
 const fs = require('fs');
 const path = require('path');
 const sanitizeHtml = require('sanitize-html');
@@ -17,13 +17,18 @@ const PORT = process.env.PORT || 3000;
 if (!process.env.GEMINI_API_KEY) {
     console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı! .env dosyanı kontrol et.");
     process.exit(1);
+} else {
+    console.log("✅ API Key yüklendi.");
 }
 
 // Logs klasörü oluştur
 if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
 // 2. MIDDLEWARE
-app.use(cors()); // Prodüksiyonda domain kısıtlaması önerilir
+app.use(cors({
+    origin: '*', // Prodüksiyonda bunu fsenyuz.com olarak kısıtlamanı öneririm
+    methods: ['GET', 'POST']
+}));
 app.use(express.json());
 
 // 3. LOGLAMA
@@ -42,9 +47,9 @@ const upload = multer({
 });
 
 // 5. GEMINI AI KURULUMU
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Botun Kişiliği
+// Botun Kişiliği (System Instruction) - Yeni SDK'de generateContent içinde geçer
 const systemInstruction = `
 You are the AI Assistant for Furkan Senyuz's portfolio website.
 Identity: You are a helpful, professional, and slightly witty AI assistant.
@@ -58,15 +63,10 @@ Key Info:
 If asked about sensitive info (phone, address), politely decline.
 `;
 
-// --- MODEL GÜNCELLEMESİ (2026 UYUMLU) ---
-// Eski model: gemini-1.5-flash (Deprecated)
-// Yeni model: gemini-2.5-flash (Stable)
+// --- MODEL SEÇİMİ ---
+// 2026 itibariyle kararlı sürüm: gemini-2.5-flash
+// Eğer 404 alırsan 'gemini-2.5-flash-latest' dene.
 const MODEL_NAME = "gemini-2.5-flash"; 
-
-const model = genAI.getGenerativeModel({ 
-    model: MODEL_NAME,
-    systemInstruction: systemInstruction
-});
 
 // Health Check
 app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", model: MODEL_NAME }));
@@ -100,19 +100,23 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             }
         }
 
-        // İçerik Hazırlama
-        let contentToSend;
+        // İçerik Hazırlama (Yeni SDK formatı: contents bir array)
+        let contents = [];
+        if (userMsg) {
+            contents.push({ role: 'user', parts: [{ text: userMsg }] });
+        }
         if (imagePart) {
-            contentToSend = [{ text: userMsg }, imagePart];
-        } else {
-            contentToSend = [{ text: userMsg }];
+            contents[contents.length - 1].parts.push(imagePart);  // Kullanıcı mesajına ekle
         }
 
-        // Yapay Zekaya Sor
+        // Yapay Zekaya Sor (Yeni SDK: generateContent direkt çağrılır, systemInstruction config'de)
         console.log(`🤖 Gemini (${MODEL_NAME}) Düşünüyor...`);
-        const result = await model.generateContent(contentToSend);
-        const response = await result.response;
-        const text = response.text();
+        const response = await genAI.models.generateContent({
+            model: MODEL_NAME,
+            contents,
+            generationConfig: { systemInstruction }  // System prompt config'de
+        });
+        const text = response.text;
         
         console.log("✅ Cevap Başarılı.");
         logUsage(req.ip, MODEL_NAME, 'SUCCESS');
@@ -122,12 +126,12 @@ app.post('/chat', upload.single('image'), async (req, res) => {
         console.error("🚨 SERVER HATASI:", error.message);
         logUsage(req.ip, MODEL_NAME, 'ERROR');
 
+        // Hata Detaylarını Analiz Et
         let userReply = "Bağlantıda küçük bir sorun oldu. Lütfen tekrar dene. 🤖";
         
-        // Hata Yönetimi
         if (error.message.includes("404") || error.message.includes("Not Found")) {
-            console.error("❌ HATA: Model bulunamadı veya API Key yetkisi yok.");
-            userReply = "Sistem şu anda bakımda (Model Yükseltmesi). Lütfen daha sonra tekrar dene.";
+            console.error("❌ HATA: Model bulunamadı. Lütfen server.js içindeki MODEL_NAME değişkenini kontrol et.");
+            userReply = "Sistem şu anda bakımda (Model Upgrade). Lütfen daha sonra tekrar dene.";
         } else if (error.message.includes("429")) {
             userReply = "Çok fazla istek geldi, biraz bekleyip tekrar dene.";
         }
@@ -138,7 +142,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
         });
 
     } finally {
-        // Temizlik
+        // Temizlik: Geçici dosyaları sil
         if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
         if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
     }
