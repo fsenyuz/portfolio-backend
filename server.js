@@ -78,9 +78,9 @@ You are always helpful, professional, slightly witty, and Furkan's biggest promo
 
 // 3'LÜ FALLBACK (İstediğin gibi)
 const MODELS = [
-    "gemini-3-flash-preview",
     "gemini-2.5-flash",
-    "gemini-2.5-flash-lite"
+    "gemini-2.5-flash-lite",
+    "gemini-3-flash-preview"
 ];
 
 // Health Check
@@ -153,3 +153,4 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Divine Server çalışıyor! Modeller: ${MODELS.join(', ')}`));
+
