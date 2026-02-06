@@ -42,7 +42,7 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// 5. GEMINI AI KURULUMU (GÜNCELLENDİ)
+// 5. GEMINI AI KURULUMU
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Botun Kişiliği (System Instruction)
@@ -59,7 +59,7 @@ Key Info:
 If asked about sensitive info (phone, address), politely decline.
 `;
 
-// Modeli Tanımla (Flash Modelini Ana Model Yaptık - Daha Kararlı)
+// Modeli Tanımla (Flash Modelini Ana Model Yaptık)
 const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
     systemInstruction: systemInstruction
@@ -92,15 +92,28 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             } catch (err) { console.error("Resim İşleme Hatası:", err); }
         }
 
-        // Gemini'ye Gönderilecek Mesaj
-        // Not: System prompt artık modelin içinde, buraya sadece kullanıcı mesajını ekliyoruz.
-        const parts = [];
-        if (imagePart) parts.push(imagePart);
-        parts.push(userMsg); // Kullanıcı metni
+        // --- GEMINI FORMAT DÜZELTMESİ (GROK REVIZESİ) ---
+        // SDK 0.21.0+ için doğru format:
+        // Sadece Metin -> String
+        // Metin + Resim -> [{ text: "..." }, { inlineData: ... }]
+        
+        let contentToSend;
+        
+        if (imagePart) {
+            // Eğer resim varsa, bir dizi (array) göndermeliyiz
+            contentToSend = [
+                { text: userMsg }, // Metni obje olarak sarıyoruz
+                imagePart          // Resmi ekliyoruz
+            ];
+        } else {
+            // Eğer sadece metin varsa, direkt string gönderebiliriz (veya yine obje olarak)
+            // Garanti olsun diye tek elemanlı dizi olarak gönderelim
+            contentToSend = [{ text: userMsg }];
+        }
 
         // Yapay Zekaya Sor
         console.log("🤖 Gemini Flash Düşünüyor...");
-        const result = await model.generateContent(parts);
+        const result = await model.generateContent(contentToSend);
         const response = await result.response;
         const text = response.text();
         
@@ -111,7 +124,6 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     } catch (error) {
         console.error("🚨 SERVER HATASI (Detaylı):", error);
         
-        // Hatanın detayını konsola yazdırıyoruz ki Render Log'da görebilelim
         if (error.response) {
             console.error("Google API Hatası:", JSON.stringify(error.response, null, 2));
         }
