@@ -45,7 +45,7 @@ const upload = multer({
 // 5. GEMINI AI KURULUMU
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Botun Kişiliği (System Instruction)
+// Botun Kişiliği (System Instruction) - Gemini 1.5 Özelliği
 const systemInstruction = `
 You are the AI Assistant for Furkan Senyuz's portfolio website.
 Identity: You are a helpful, professional, and slightly witty AI assistant.
@@ -59,10 +59,13 @@ Key Info:
 If asked about sensitive info (phone, address), politely decline.
 `;
 
-// Modeli Tanımla (Flash Modelini Ana Model Yaptık)
+// Modeli Tanımla (Flash Model - Hızlı ve Kararlı)
 const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash",
-    systemInstruction: systemInstruction
+    systemInstruction: {
+        parts: [{ text: systemInstruction }],
+        role: "model"
+    }
 });
 
 // Health Check
@@ -81,39 +84,36 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             try {
                 const optimizedPath = req.file.path + '-opt.jpg';
                 await sharp(req.file.path).rotate().resize(800).jpeg({ quality: 80 }).toFile(optimizedPath);
+                
+                // Gemini Formatı
                 imagePart = {
                     inlineData: {
                         data: fs.readFileSync(optimizedPath).toString("base64"),
                         mimeType: "image/jpeg"
                     }
                 };
+                
                 fs.unlinkSync(req.file.path);
                 fs.unlinkSync(optimizedPath);
             } catch (err) { console.error("Resim İşleme Hatası:", err); }
         }
 
-        // --- GEMINI FORMAT DÜZELTMESİ (GROK REVIZESİ) ---
-        // SDK 0.21.0+ için doğru format:
-        // Sadece Metin -> String
-        // Metin + Resim -> [{ text: "..." }, { inlineData: ... }]
-        
-        let contentToSend;
-        
+        // --- GROK & GEMINI ORTAK YAPIMI (GÜVENLİ FORMAT) ---
+        let parts = [];
         if (imagePart) {
-            // Eğer resim varsa, bir dizi (array) göndermeliyiz
-            contentToSend = [
-                { text: userMsg }, // Metni obje olarak sarıyoruz
-                imagePart          // Resmi ekliyoruz
+            // Resim varsa: Önce metin, sonra resim (veya tam tersi, ikisi de olur)
+            parts = [
+                { text: userMsg },
+                imagePart
             ];
         } else {
-            // Eğer sadece metin varsa, direkt string gönderebiliriz (veya yine obje olarak)
-            // Garanti olsun diye tek elemanlı dizi olarak gönderelim
-            contentToSend = [{ text: userMsg }];
+            // Sadece metin varsa: Obje olarak gönder
+            parts = [{ text: userMsg }];
         }
 
         // Yapay Zekaya Sor
         console.log("🤖 Gemini Flash Düşünüyor...");
-        const result = await model.generateContent(contentToSend);
+        const result = await model.generateContent(parts);
         const response = await result.response;
         const text = response.text();
         
@@ -122,12 +122,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
         res.json({ reply: text, model: 'flash' });
 
     } catch (error) {
-        console.error("🚨 SERVER HATASI (Detaylı):", error);
-        
-        if (error.response) {
-            console.error("Google API Hatası:", JSON.stringify(error.response, null, 2));
-        }
-        
+        console.error("🚨 SERVER HATASI:", error);
         res.status(500).json({ 
             reply: "Bağlantıda küçük bir sorun oldu. Lütfen tekrar dene. 🤖", 
             error: error.message 
