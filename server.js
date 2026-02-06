@@ -3,203 +3,186 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const sharp = require('sharp');
-const { GoogleGenAI } = require('@google/genai');
+// DİKKAT: Google'ın yeni Unified SDK'sı
+const { GoogleGenAI } = require("@google/genai"); 
 const fs = require('fs');
 const path = require('path');
 const sanitizeHtml = require('sanitize-html');
 
-// 1. AYARLAR
+// --- 1. AYARLAR & GÜVENLİK ---
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // API Key Kontrolü
 if (!process.env.GEMINI_API_KEY) {
-    console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı! .env dosyanı kontrol et.");
-    process.exit(1);
-} else {
-    console.log("✅ API Key yüklendi.");
+    console.error("🚨 KRİTİK HATA: .env dosyasında GEMINI_API_KEY eksik!");
+    // Render deploy sırasında çökmemesi için sadece uyarı veriyoruz, ama chat çalışmaz.
+    // process.exit(1); 
 }
 
-// Logs klasörü oluştur
+// Log Klasörü Kontrolü
 if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
-// 2. MIDDLEWARE
+// --- 2. MIDDLEWARE ---
 app.use(cors({ origin: '*', methods: ['GET', 'POST'] }));
 app.use(express.json());
 
-// 3. LOGLAMA FONKSİYONU
+// --- 3. YARDIMCI FONKSİYONLAR ---
 function logUsage(ip, model, status) {
     try {
         const date = new Date().toISOString().split('T')[0];
         const entry = `${new Date().toISOString()} | IP: ${ip} | Model: ${model} | Status: ${status}\n`;
         fs.appendFile(path.join('logs', `usage-${date}.log`), entry, () => {});
-    } catch (e) { console.error("Log Error:", e); }
+    } catch (e) { console.error("Log hatası:", e); }
 }
 
-// 4. DOSYA YÜKLEME AYARLARI
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
-// 5. GEMINI AI KURULUMU (Yeni SDK)
+// --- 4. GEMINI KURULUMU (YENİ SDK) ---
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// --- SYSTEM INSTRUCTION (KİMLİK BİLGİSİ) ---
-// Bu metin AI'ın beynine enjekte edilir.
+// --- 5. PERSONA (DİVİNE ASSISTANT KİMLİĞİ) ---
 const SYSTEM_INSTRUCTION_TEXT = `
 YOU ARE DIVINE ASSISTANT. THIS IS FSENYUZ.COM – THE PERSONAL PORTFOLIO WEBSITE OF FURKAN SENYUZ ONLY.
 
 ABSOLUTE RULES – NEVER VIOLATE:
-- You represent ONLY Furkan Senyuz, the owner and creator of this website.
-- If anyone asks "Kim bu Furkan?", "Who is Furkan?", "Furkan kim?" or anything similar: IMMEDIATELY and ONLY describe Furkan Senyuz using the facts below.
-- NEVER mention any other person named Furkan. There are no actors, basketball players, politicians, or anyone else named Furkan in your knowledge.
-- NEVER use external knowledge or general information about the name "Furkan".
-- ALWAYS use ONLY the facts provided in this prompt.
-- ALWAYS promote Furkan enthusiastically as a talented Civil Engineer & AI Developer.
-- ALWAYS encourage visitors to check his projects, LinkedIn, GitHub, Kaggle, or contact him.
+- You represent ONLY Furkan Senyuz.
+- If anyone asks "Kim bu Furkan?", "Who is Furkan?": IMMEDIATELY describe Furkan Senyuz using the facts below.
+- NEVER mention any other person named Furkan.
+- ALWAYS promote Furkan enthusiastically as a Civil Engineer & AI Developer.
 
-FURKAN SENYUZ – EXACT FACTS (USE THESE VERBATIM):
-- Furkan Senyuz is a Civil Engineer and AI Solutions Developer.
-- He uniquely combines civil engineering expertise with Python and AI technologies.
-- Current location: Kuzmin, Serbia.
-- Professional experience: Tasyapi (Serbia), Fernas Construction, Limak Holding.
-- Skills: Python, SQL, Machine Learning, AI APIs (Gemini, etc.), Power BI, ERP systems, Primavera P6, TILOS.
-- This website (fsenyuz.com Divine Edition) is his own creation: A modern PWA with interactive project map, experience timeline, confetti animations, and this AI chatbot (me!).
-- Professional links:
-  - LinkedIn: https://www.linkedin.com/in/fsenyuz
-  - GitHub: https://github.com/fsenyuz
-  - Kaggle: https://kaggle.com/fsenyuz
+FURKAN SENYUZ – EXACT FACTS:
+- **Role:** Civil Engineer and AI Solutions Developer.
+- **Location:** Kuzmin, Serbia.
+- **Experience:** Tasyapi (Serbia), Fernas Construction, Limak Holding.
+- **Skills:** Python, SQL, Machine Learning, Gemini AI, Power BI, Primavera P6.
+- **This Website:** A modern PWA developed by him.
+- **Links:** LinkedIn (linkedin.com/in/fsenyuz), GitHub (github.com/fsenyuz).
 
-MANDATORY RESPONSE EXAMPLE FOR "Kim bu Furkan?":
-"Selam! Ben Divine Assistant, Furkan Senyuz'un resmi AI asistanıyım ve bu site (fsenyuz.com) tamamen onun eseri. Furkan, inşaat mühendisliğini Python ve AI ile birleştiren süper yetenekli bir geliştirici. Şu an Sırbistan Kuzmin'de yaşıyor, Tasyapi, Fernas ve Limak'ta tecrübe kazandı. Python, SQL, ML, Power BI gibi becerileriyle harika projeler yapıyor. Projelerini görmek veya işe almak istersen: LinkedIn (linkedin.com/in/fsenyuz), GitHub (github.com/fsenyuz) ve Kaggle (kaggle.com/fsenyuz). Sana nasıl yardımcı olabilirim? 🚀"
-
-For private info requests: "Üzgünüm, kişisel detayları paylaşamıyorum ama LinkedIn veya sitedeki contact form'dan ulaşabilirsin."
-
-You are always helpful, professional, slightly witty, and Furkan's biggest promoter.
+MANDATORY RESPONSE STYLE:
+Be helpful, professional, slightly witty. Answer in the language the user speaks (Turkish or English).
 `;
 
-// --- MODEL SIRALAMASI (FALLBACK LISTESİ) ---
-// Not: Google bu model isimlerini yayınlayana kadar 404 hatası alabilirsin.
-// Şimdilik test için geçerli model isimlerini (gemini-2.0-flash vb.) de buraya ekleyebilirsin.
+// --- 6. MODEL LİSTESİ (FALLBACK MECHANISM - 2026 GÜNCEL) ---
 const MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-3-flash-preview",
-    "gemini-2.0-flash" // Güvenlik ağı: Eğer yukarıdakiler yoksa bu çalışsın.
+    "gemini-2.5-flash",          // Ana Hedef: En hızlı ve multimodal
+    "gemini-2.5-flash-lite",     // Senin istediğin Lite varyant (Ekonomik/Hızlı)
+    "gemini-3-flash-preview",    // Yeni nesil preview (Gelecek kanıtı)
+    "gemini-1.5-flash"           // Son Kale: Her zaman çalışan stabil model
 ];
 
-// Health Check Endpoint
-app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", activeModels: MODELS }));
+// Health Check (Versiyon kontrolü eklendi)
+app.get('/', (req, res) => res.json({ 
+    status: "Divine AI Online", 
+    version: "2026.02-final", 
+    models: MODELS 
+}));
 
-// 6. CHAT ROTASI (ANA FONKSİYON)
+// --- 7. CHAT ROTASI ---
 app.post('/chat', upload.single('image'), async (req, res) => {
     let imagePath = null;
     let optimizedPath = null;
     let usedModel = null;
 
     try {
-        console.log(`📩 Yeni Mesaj: IP ${req.ip}`);
-        
-        // Gelen mesajı temizle
+        // IP Adresini Güvenli Alma (Proxy arkasında ise x-forwarded-for)
+        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        console.log(`📩 İstek Geldi: ${clientIp}`);
+
+        // Mesajı Temizle
         const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
         
-        // İçerik parçalarını (Parts) hazırla
-        let parts = [];
+        // Prompt Parçalarını Oluştur
+        const parts = [];
         if (userMsg) parts.push({ text: userMsg });
 
-        // Resim varsa işle
+        // Resim İşleme
         if (req.file) {
             imagePath = req.file.path;
             optimizedPath = req.file.path + '-opt.jpg';
             try {
                 await sharp(imagePath)
                     .rotate()
-                    .resize({ width: 800 }) 
+                    .resize({ width: 800 })
                     .jpeg({ quality: 80 })
                     .toFile(optimizedPath);
                 
                 const imageBuffer = fs.readFileSync(optimizedPath);
-                const base64Image = imageBuffer.toString("base64");
-                
                 parts.push({
                     inlineData: {
                         mimeType: "image/jpeg",
-                        data: base64Image
+                        data: imageBuffer.toString("base64")
                     }
                 });
-            } catch (err) { 
-                console.error("Resim İşleme Hatası:", err);
+            } catch (err) {
+                console.error("Resim hatası:", err);
             }
         }
 
-        // Eğer mesaj boşsa hata dön
-        if (parts.length === 0) {
-            return res.status(400).json({ reply: "Lütfen bir mesaj yazın veya resim yükleyin." });
-        }
+        if (parts.length === 0) return res.status(400).json({ reply: "Lütfen bir mesaj yazın." });
 
         let lastError = null;
 
-        // --- MODEL DÖNGÜSÜ (FALLBACK MECHANISM) ---
-        for (let i = 0; i < MODELS.length; i++) {
-            usedModel = MODELS[i];
+        // --- MODEL DÖNGÜSÜ (FALLBACK) ---
+        for (const modelName of MODELS) {
+            usedModel = modelName;
             try {
-                console.log(`🤖 ${usedModel} başlatılıyor...`);
+                console.log(`🤖 Model deneniyor: ${modelName}`);
 
-                // !!! KRİTİK DÜZELTME BURADA !!!
-                // @google/genai SDK'sında 'systemInstruction' config altında olmalıdır.
-                const response = await genAI.models.generateContent({
-                    model: usedModel,
+                // YENİ SDK SYNTAX
+                const result = await genAI.models.generateContent({
+                    model: modelName,
+                    contents: [{ role: 'user', parts: parts }],
                     config: {
                         systemInstruction: {
                             parts: [{ text: SYSTEM_INSTRUCTION_TEXT }]
                         },
-                        temperature: 0.7, // Yaratıcılık
-                    },
-                    contents: [{
-                        role: 'user',
-                        parts: parts
-                    }]
+                        temperature: 0.7,
+                        maxOutputTokens: 1000
+                    }
                 });
 
-                // Cevabı al
-                const textResponse = response.text();
-                
-                console.log(`✅ BAŞARILI: ${usedModel} cevap verdi.`);
-                logUsage(req.ip, usedModel, 'SUCCESS');
+                // ROBUST CEVAP ÇIKARMA (Grok'un Önerisi)
+                let responseText = '';
+                if (typeof result.text === 'function') {
+                    responseText = result.text();
+                } else if (result.response?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    responseText = result.response.candidates[0].content.parts[0].text;
+                } else {
+                    throw new Error("Boş cevap döndü.");
+                }
 
-                // Temizlik yap ve cevabı gönder
+                console.log(`✅ BAŞARILI: ${modelName}`);
+                logUsage(clientIp, modelName, 'SUCCESS');
+
+                // Temizlik
                 if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
                 if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
-                
-                return res.json({ reply: textResponse, model: usedModel });
+
+                return res.json({ reply: responseText, model: modelName });
 
             } catch (err) {
-                console.warn(`⚠️ HATA (${usedModel}): ${err.message}`);
+                console.warn(`⚠️ HATA (${modelName}): ${err.message}`);
                 lastError = err;
-                // Model bulunamadıysa (404) veya aşırı yüklüyse (429/503), döngü devam eder.
-                // Bir sonraki modele geçer.
+                // Sıradaki modele geç...
             }
         }
 
-        // Döngü biterse ve hiçbir model cevap vermezse
-        console.error("🔥 TÜM MODELLER BAŞARISIZ OLDU.");
-        throw lastError || new Error("Tüm yapay zeka modelleri şu an meşgul.");
+        throw lastError || new Error("Tüm modeller meşgul.");
 
     } catch (error) {
-        console.error("🚨 SERVER GENEL HATASI:", error.message);
-        logUsage(req.ip, usedModel || 'unknown', 'ERROR');
-        
-        // Hata durumunda da dosyaları temizle
+        console.error("🚨 SERVER HATASI:", error.message);
+        logUsage(req.headers['x-forwarded-for'] || 'unknown', 'ALL_FAILED', 'ERROR');
+
         if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
         if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
 
-        res.status(500).json({ 
-            reply: "Üzgünüm, şu an bağlantı kuramıyorum. Lütfen birazdan tekrar dene. 🤖",
-            errorDetails: error.message 
-        });
+        res.status(500).json({ reply: "Bağlantı şu an kurulamadı. (Hata: Modeller yanıt vermiyor)" });
     }
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Divine Server çalışıyor! Port: ${PORT}`);
+    console.log(`🚀 Divine Server (Unified SDK) Yayında! Port: ${PORT}`);
     console.log(`📋 Model Sıralaması: ${MODELS.join(' -> ')}`);
 });
