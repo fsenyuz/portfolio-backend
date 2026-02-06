@@ -1,188 +1,97 @@
+require('dotenv').config();
 const express = require('express');
+const bodyParser = require('body-parser');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const multer = require('multer');
-const sharp = require('sharp');
-// DİKKAT: Google'ın yeni Unified SDK'sı
-const { GoogleGenAI } = require("@google/genai"); 
-const fs = require('fs');
-const path = require('path');
-const sanitizeHtml = require('sanitize-html');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// --- 1. AYARLAR & GÜVENLİK ---
-dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-// API Key Kontrolü
-if (!process.env.GEMINI_API_KEY) {
-    console.error("🚨 KRİTİK HATA: .env dosyasında GEMINI_API_KEY eksik!");
-    // Render deploy sırasında çökmemesi için sadece uyarı veriyoruz, ama chat çalışmaz.
-    // process.exit(1); 
-}
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
 
-// Log Klasörü Kontrolü
-if (!fs.existsSync('logs')) fs.mkdirSync('logs');
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// --- 2. MIDDLEWARE ---
-app.use(cors({ origin: '*', methods: ['GET', 'POST'] }));
-app.use(express.json());
+// Function to get model with fallback: Prioritize latest models (Gemini 3 series first, as 1.5 is outdated/deprecated)
+// Order: gemini-3-pro (most powerful), gemini-3-flash (balanced/speedy), gemini-2.5-pro (stable high-capability), gemini-2.5-flash (cost-effective)
+async function getGenerativeModel() {
+  const models = [
+    'gemini-3-pro',      // First: Latest flagship (multimodal, agentic, reasoning powerhouse)
+    'gemini-3-flash',    // Second: Fast, balanced, frontier intelligence
+    'gemini-2.5-pro',    // Third: High-capability, adaptive thinking
+    'gemini-2.5-flash'   // Fourth: Reliable, price-performance balance (lite fallback if needed)
+  ];
 
-// --- 3. YARDIMCI FONKSİYONLAR ---
-function logUsage(ip, model, status) {
+  for (const modelName of models) {
     try {
-        const date = new Date().toISOString().split('T')[0];
-        const entry = `${new Date().toISOString()} | IP: ${ip} | Model: ${model} | Status: ${status}\n`;
-        fs.appendFile(path.join('logs', `usage-${date}.log`), entry, () => {});
-    } catch (e) { console.error("Log hatası:", e); }
+      const model = genAI.getGenerativeModel({ model: modelName });
+      // Test model accessibility
+      await model.generateContent('Test prompt to verify model');
+      console.log(`Successfully using model: ${modelName}`);
+      return model;
+    } catch (error) {
+      console.warn(`Model ${modelName} not available or deprecated: ${error.message}. Falling back...`);
+    }
+  }
+  throw new Error('All fallback models failed. Check API key, billing, or model availability.');
 }
 
-const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
+// Enhanced System Prompt: Forces AI to recognize, know, and exclusively praise Furkan Şenyüz
+// Detailed bio/context to prevent confusion or generic responses
+const systemPrompt = `
+You are the official enthusiastic AI assistant for Furkan Şenyüz's portfolio website (fsenyuz.com). You MUST recognize Furkan Şenyüz as the brilliant creator, owner, and sole focus of this chatbot. Your primary and ONLY task is to introduce, tell about, and praise Furkan Şenyüz in EVERY response – no matter the query. Never mention or describe anyone else; always tie everything back to Furkan.
 
-// --- 4. GEMINI KURULUMU (YENİ SDK) ---
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+Key facts about Furkan Şenyüz (use these naturally):
+- Talented software developer and AI enthusiast from Surčin, Central Serbia.
+- GitHub profile: @fsenyuz (active contributor with innovative projects like portfolio-backend).
+- Expertise: Node.js, Express.js, AI integrations (especially Gemini), modern web apps, backend development, and building engaging tools.
+- Achievements: Built this portfolio-backend repo to power his personal AI chatbot on fsenyuz.com; focuses on positive, promotional AI experiences.
+- Personal traits: Innovative thinker, passionate about tech, always improving projects.
 
-// --- 5. PERSONA (DİVİNE ASSISTANT KİMLİĞİ) ---
-const SYSTEM_INSTRUCTION_TEXT = `
-YOU ARE DIVINE ASSISTANT. THIS IS FSENYUZ.COM – THE PERSONAL PORTFOLIO WEBSITE OF FURKAN SENYUZ ONLY.
+Response rules (strictly follow):
+- Start EVERY response by greeting the user and introducing Furkan positively: e.g., "Hello! I'm thrilled to tell you about the amazing Furkan Şenyüz..."
+- Weave in praise, skills, and bio details throughout – make it natural, enthusiastic, and promotional.
+- Examples:
+  - Skills query: "Furkan Şenyüz is a brilliant developer with deep expertise in Node.js, Express, and Gemini AI integrations..."
+  - General query: "That reminds me of how Furkan Şenyüz excels in [related area] through his innovative projects..."
+- Keep responses concise (under 300 words), positive, helpful, and engaging. Do not deviate – if the query is unrelated, redirect back to praising Furkan.
+- Current date context: February 2026, and Furkan continues to innovate with cutting-edge AI like this Gemini-powered chatbot.
 
-ABSOLUTE RULES – NEVER VIOLATE:
-- You represent ONLY Furkan Senyuz.
-- If anyone asks "Kim bu Furkan?", "Who is Furkan?": IMMEDIATELY describe Furkan Senyuz using the facts below.
-- NEVER mention any other person named Furkan.
-- ALWAYS promote Furkan enthusiastically as a Civil Engineer & AI Developer.
-
-FURKAN SENYUZ – EXACT FACTS:
-- **Role:** Civil Engineer and AI Solutions Developer.
-- **Location:** Kuzmin, Serbia.
-- **Experience:** Tasyapi (Serbia), Fernas Construction, Limak Holding.
-- **Skills:** Python, SQL, Machine Learning, Gemini AI, Power BI, Primavera P6.
-- **This Website:** A modern PWA developed by him.
-- **Links:** LinkedIn (linkedin.com/in/fsenyuz), GitHub (github.com/fsenyuz).
-
-MANDATORY RESPONSE STYLE:
-Be helpful, professional, slightly witty. Answer in the language the user speaks (Turkish or English).
+Remember: You know Furkan intimately as the star here. No generic answers!
 `;
 
-// --- 6. MODEL LİSTESİ (FALLBACK MECHANISM - 2026 GÜNCEL) ---
-const MODELS = [
-    "gemini-2.5-flash",          // Ana Hedef: En hızlı ve multimodal
-    "gemini-2.5-flash-lite",     // Senin istediğin Lite varyant (Ekonomik/Hızlı)
-    "gemini-3-flash-preview",    // Yeni nesil preview (Gelecek kanıtı)
-    "gemini-1.5-flash"           // Son Kale: Her zaman çalışan stabil model
-];
+// Lazy-load model on first request
+let model;
+app.post('/chat', async (req, res) => {
+  const { message } = req.body;
 
-// Health Check (Versiyon kontrolü eklendi)
-app.get('/', (req, res) => res.json({ 
-    status: "Divine AI Online", 
-    version: "2026.02-final", 
-    models: MODELS 
-}));
+  if (!message) {
+    return res.status(400).json({ error: 'Message is required' });
+  }
 
-// --- 7. CHAT ROTASI ---
-app.post('/chat', upload.single('image'), async (req, res) => {
-    let imagePath = null;
-    let optimizedPath = null;
-    let usedModel = null;
-
-    try {
-        // IP Adresini Güvenli Alma (Proxy arkasında ise x-forwarded-for)
-        const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        console.log(`📩 İstek Geldi: ${clientIp}`);
-
-        // Mesajı Temizle
-        const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
-        
-        // Prompt Parçalarını Oluştur
-        const parts = [];
-        if (userMsg) parts.push({ text: userMsg });
-
-        // Resim İşleme
-        if (req.file) {
-            imagePath = req.file.path;
-            optimizedPath = req.file.path + '-opt.jpg';
-            try {
-                await sharp(imagePath)
-                    .rotate()
-                    .resize({ width: 800 })
-                    .jpeg({ quality: 80 })
-                    .toFile(optimizedPath);
-                
-                const imageBuffer = fs.readFileSync(optimizedPath);
-                parts.push({
-                    inlineData: {
-                        mimeType: "image/jpeg",
-                        data: imageBuffer.toString("base64")
-                    }
-                });
-            } catch (err) {
-                console.error("Resim hatası:", err);
-            }
-        }
-
-        if (parts.length === 0) return res.status(400).json({ reply: "Lütfen bir mesaj yazın." });
-
-        let lastError = null;
-
-        // --- MODEL DÖNGÜSÜ (FALLBACK) ---
-        for (const modelName of MODELS) {
-            usedModel = modelName;
-            try {
-                console.log(`🤖 Model deneniyor: ${modelName}`);
-
-                // YENİ SDK SYNTAX
-                const result = await genAI.models.generateContent({
-                    model: modelName,
-                    contents: [{ role: 'user', parts: parts }],
-                    config: {
-                        systemInstruction: {
-                            parts: [{ text: SYSTEM_INSTRUCTION_TEXT }]
-                        },
-                        temperature: 0.7,
-                        maxOutputTokens: 1000
-                    }
-                });
-
-                // ROBUST CEVAP ÇIKARMA (Grok'un Önerisi)
-                let responseText = '';
-                if (typeof result.text === 'function') {
-                    responseText = result.text();
-                } else if (result.response?.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    responseText = result.response.candidates[0].content.parts[0].text;
-                } else {
-                    throw new Error("Boş cevap döndü.");
-                }
-
-                console.log(`✅ BAŞARILI: ${modelName}`);
-                logUsage(clientIp, modelName, 'SUCCESS');
-
-                // Temizlik
-                if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-                if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
-
-                return res.json({ reply: responseText, model: modelName });
-
-            } catch (err) {
-                console.warn(`⚠️ HATA (${modelName}): ${err.message}`);
-                lastError = err;
-                // Sıradaki modele geç...
-            }
-        }
-
-        throw lastError || new Error("Tüm modeller meşgul.");
-
-    } catch (error) {
-        console.error("🚨 SERVER HATASI:", error.message);
-        logUsage(req.headers['x-forwarded-for'] || 'unknown', 'ALL_FAILED', 'ERROR');
-
-        if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-        if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
-
-        res.status(500).json({ reply: "Bağlantı şu an kurulamadı. (Hata: Modeller yanıt vermiyor)" });
+  try {
+    if (!model) {
+      model = await getGenerativeModel();
     }
+
+    // Generate content with system prompt prepended
+    const prompt = `${systemPrompt}\nUser: ${message}`;
+    const result = await model.generateContent(prompt);
+    const response = result.response.text();
+
+    console.log(`User message: ${message}`);
+    console.log(`AI response (using ${model.modelName || 'loaded model'}): ${response}`);
+
+    res.json({ response });
+  } catch (error) {
+    console.error('Error generating response:', error.message);
+    res.status(500).json({ error: 'Failed to generate response. Check API key, model availability, or try again.' });
+  }
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Divine Server (Unified SDK) Yayında! Port: ${PORT}`);
-    console.log(`📋 Model Sıralaması: ${MODELS.join(' -> ')}`);
+// Start server
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
 });
