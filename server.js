@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 
 // API Key Kontrolü
 if (!process.env.GEMINI_API_KEY) {
-    console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı!");
+    console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı! .env dosyanı kontrol et.");
     process.exit(1);
 } else {
     console.log("✅ API Key yüklendi.");
@@ -28,7 +28,7 @@ if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 app.use(cors({ origin: '*', methods: ['GET', 'POST'] }));
 app.use(express.json());
 
-// 3. LOGLAMA
+// 3. LOGLAMA FONKSİYONU
 function logUsage(ip, model, status) {
     try {
         const date = new Date().toISOString().split('T')[0];
@@ -37,14 +37,15 @@ function logUsage(ip, model, status) {
     } catch (e) { console.error("Log Error:", e); }
 }
 
-// 4. DOSYA YÜKLEME
+// 4. DOSYA YÜKLEME AYARLARI
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
-// 5. GEMINI AI KURULUMU
+// 5. GEMINI AI KURULUMU (Yeni SDK)
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// NUKE SEVİYESİNDE KATİ PROMPT (Başka Furkan yok, sadece sen!)
-const systemInstruction = `
+// --- SYSTEM INSTRUCTION (KİMLİK BİLGİSİ) ---
+// Bu metin AI'ın beynine enjekte edilir.
+const SYSTEM_INSTRUCTION_TEXT = `
 YOU ARE DIVINE ASSISTANT. THIS IS FSENYUZ.COM – THE PERSONAL PORTFOLIO WEBSITE OF FURKAN SENYUZ ONLY.
 
 ABSOLUTE RULES – NEVER VIOLATE:
@@ -76,17 +77,20 @@ For private info requests: "Üzgünüm, kişisel detayları paylaşamıyorum ama
 You are always helpful, professional, slightly witty, and Furkan's biggest promoter.
 `;
 
-// 3'LÜ FALLBACK (İstediğin gibi)
+// --- MODEL SIRALAMASI (FALLBACK LISTESİ) ---
+// Not: Google bu model isimlerini yayınlayana kadar 404 hatası alabilirsin.
+// Şimdilik test için geçerli model isimlerini (gemini-2.0-flash vb.) de buraya ekleyebilirsin.
 const MODELS = [
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
-    "gemini-3-flash-preview"
+    "gemini-3-flash-preview",
+    "gemini-2.0-flash" // Güvenlik ağı: Eğer yukarıdakiler yoksa bu çalışsın.
 ];
 
-// Health Check
-app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", models: MODELS }));
+// Health Check Endpoint
+app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", activeModels: MODELS }));
 
-// 6. CHAT ROTASI
+// 6. CHAT ROTASI (ANA FONKSİYON)
 app.post('/chat', upload.single('image'), async (req, res) => {
     let imagePath = null;
     let optimizedPath = null;
@@ -95,62 +99,107 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     try {
         console.log(`📩 Yeni Mesaj: IP ${req.ip}`);
         
+        // Gelen mesajı temizle
         const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
         
-        let imagePart = null;
+        // İçerik parçalarını (Parts) hazırla
+        let parts = [];
+        if (userMsg) parts.push({ text: userMsg });
+
+        // Resim varsa işle
         if (req.file) {
             imagePath = req.file.path;
             optimizedPath = req.file.path + '-opt.jpg';
             try {
-                await sharp(imagePath).rotate().resize(800).jpeg({ quality: 80 }).toFile(optimizedPath);
-                imagePart = {
+                await sharp(imagePath)
+                    .rotate()
+                    .resize({ width: 800 }) 
+                    .jpeg({ quality: 80 })
+                    .toFile(optimizedPath);
+                
+                const imageBuffer = fs.readFileSync(optimizedPath);
+                const base64Image = imageBuffer.toString("base64");
+                
+                parts.push({
                     inlineData: {
-                        data: fs.readFileSync(optimizedPath).toString("base64"),
-                        mimeType: "image/jpeg"
+                        mimeType: "image/jpeg",
+                        data: base64Image
                     }
-                };
+                });
             } catch (err) { 
-                console.error("Resim Hatası:", err);
+                console.error("Resim İşleme Hatası:", err);
             }
         }
 
-        let contents = [];
-        if (userMsg) contents.push({ role: 'user', parts: [{ text: userMsg }] });
-        if (imagePart) contents[contents.length - 1].parts.push(imagePart);
+        // Eğer mesaj boşsa hata dön
+        if (parts.length === 0) {
+            return res.status(400).json({ reply: "Lütfen bir mesaj yazın veya resim yükleyin." });
+        }
 
-        let error = null;
+        let lastError = null;
+
+        // --- MODEL DÖNGÜSÜ (FALLBACK MECHANISM) ---
         for (let i = 0; i < MODELS.length; i++) {
             usedModel = MODELS[i];
             try {
-                console.log(`🤖 ${usedModel} çalışıyor...`);
+                console.log(`🤖 ${usedModel} başlatılıyor...`);
+
+                // !!! KRİTİK DÜZELTME BURADA !!!
+                // @google/genai SDK'sında 'systemInstruction' config altında olmalıdır.
                 const response = await genAI.models.generateContent({
                     model: usedModel,
-                    contents,
-                    generationConfig: { systemInstruction }
+                    config: {
+                        systemInstruction: {
+                            parts: [{ text: SYSTEM_INSTRUCTION_TEXT }]
+                        },
+                        temperature: 0.7, // Yaratıcılık
+                    },
+                    contents: [{
+                        role: 'user',
+                        parts: parts
+                    }]
                 });
-                const text = response.text;
+
+                // Cevabı al
+                const textResponse = response.text();
                 
-                console.log(`✅ Başarılı: ${usedModel}`);
+                console.log(`✅ BAŞARILI: ${usedModel} cevap verdi.`);
                 logUsage(req.ip, usedModel, 'SUCCESS');
-                return res.json({ reply: text, model: usedModel });
+
+                // Temizlik yap ve cevabı gönder
+                if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+                if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
+                
+                return res.json({ reply: textResponse, model: usedModel });
+
             } catch (err) {
-                error = err;
-                console.error(`🚨 Hata (${usedModel}): ${err.message}`);
-                logUsage(req.ip, usedModel, 'ERROR');
-                if (!err.message.includes("429") && !err.message.includes("404")) throw err;
+                console.warn(`⚠️ HATA (${usedModel}): ${err.message}`);
+                lastError = err;
+                // Model bulunamadıysa (404) veya aşırı yüklüyse (429/503), döngü devam eder.
+                // Bir sonraki modele geçer.
             }
         }
-        throw error || new Error("Tüm modeller meşgul.");
+
+        // Döngü biterse ve hiçbir model cevap vermezse
+        console.error("🔥 TÜM MODELLER BAŞARISIZ OLDU.");
+        throw lastError || new Error("Tüm yapay zeka modelleri şu an meşgul.");
 
     } catch (error) {
-        console.error("🚨 SERVER HATASI:", error.message);
+        console.error("🚨 SERVER GENEL HATASI:", error.message);
         logUsage(req.ip, usedModel || 'unknown', 'ERROR');
-        res.status(500).json({ reply: "Bağlantı hatası veya kota dolu. Retry butonuna bas veya biraz bekle 🤖" });
-    } finally {
+        
+        // Hata durumunda da dosyaları temizle
         if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
         if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
+
+        res.status(500).json({ 
+            reply: "Üzgünüm, şu an bağlantı kuramıyorum. Lütfen birazdan tekrar dene. 🤖",
+            errorDetails: error.message 
+        });
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Divine Server çalışıyor! Modeller: ${MODELS.join(', ')}`));
-
+app.listen(PORT, () => {
+    console.log(`🚀 Divine Server çalışıyor! Port: ${PORT}`);
+    console.log(`📋 Model Sıralaması: ${MODELS.join(' -> ')}`);
+});
