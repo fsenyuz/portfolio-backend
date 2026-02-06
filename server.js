@@ -40,8 +40,7 @@ function logUsage(ip, model, status) {
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
 // --- 4. GEMINI KURULUMU (YENİ SDK) ---
-// KRİTİK: apiVersion 'v1' olarak ayarlandı (v1beta hatalarını çözer)
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, apiVersion: 'v1' });
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // --- 5. PERSONA (DİVİNE ASSISTANT KİMLİĞİ) ---
 const SYSTEM_INSTRUCTION_TEXT = `
@@ -65,18 +64,18 @@ MANDATORY RESPONSE STYLE:
 Be helpful, professional, slightly witty. Answer in the language the user speaks (Turkish or English).
 `;
 
-// --- 6. MODEL LİSTESİ (FALLBACK MECHANISM - SENİN AI STUDIO ERİŞİMİNE GÖRE MİNİMİZE) ---
-// Başa çalışan modeller: Gemini 3 Flash, 2.5 Flash, 2.5 Flash Lite. Diğerleri fallback.
+// --- 6. MODEL LİSTESİ (FALLBACK MECHANISM - 2026 GÜNCEL) ---
 const MODELS = [
-    "gemini-3-flash",            // Senin listende Gemini 3 Flash (çalışmalı)
-    "gemini-2.5-flash",          // Gemini 2.5 Flash
-    "gemini-2.5-flash-lite"    // Gemini 2.5 Flash Lite
+    "gemini-2.5-flash",          // Ana Hedef: En hızlı ve multimodal
+    "gemini-2.5-flash-lite",     // Senin istediğin Lite varyant (Ekonomik/Hızlı)
+    "gemini-3-flash-preview",    // Yeni nesil preview (Gelecek kanıtı)
+    "gemini-1.5-flash"           // Son Kale: Her zaman çalışan stabil model
 ];
 
 // Health Check (Versiyon kontrolü eklendi)
 app.get('/', (req, res) => res.json({ 
     status: "Divine AI Online", 
-    version: "2026.02-final-fix2", 
+    version: "2026.02-final", 
     models: MODELS 
 }));
 
@@ -94,9 +93,9 @@ app.post('/chat', upload.single('image'), async (req, res) => {
         // Mesajı Temizle
         const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
         
-        // Prompt Parçalarını Oluştur (System instruction'ı user prompt'una enjekte et - role destek sorunu için)
-        const combinedPrompt = SYSTEM_INSTRUCTION_TEXT + "\n\nUser Message: " + userMsg;
-        const parts = [{ text: combinedPrompt }];
+        // Prompt Parçalarını Oluştur
+        const parts = [];
+        if (userMsg) parts.push({ text: userMsg });
 
         // Resim İşleme
         if (req.file) {
@@ -131,17 +130,20 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             try {
                 console.log(`🤖 Model deneniyor: ${modelName}`);
 
-                // YENİ SDK SYNTAX: Sadece user role, system enjekte edildi (hataları çözer)
+                // YENİ SDK SYNTAX
                 const result = await genAI.models.generateContent({
                     model: modelName,
                     contents: [{ role: 'user', parts: parts }],
-                    generationConfig: {
-                        temperature: 0.5,  // Düşük: Stabilite
-                        maxOutputTokens: 500  // Düşük: Rate limit için
+                    config: {
+                        systemInstruction: {
+                            parts: [{ text: SYSTEM_INSTRUCTION_TEXT }]
+                        },
+                        temperature: 0.7,
+                        maxOutputTokens: 1000
                     }
                 });
 
-                // ROBUST CEVAP ÇIKARMA
+                // ROBUST CEVAP ÇIKARMA (Grok'un Önerisi)
                 let responseText = '';
                 if (typeof result.text === 'function') {
                     responseText = result.text();
@@ -184,4 +186,3 @@ app.listen(PORT, () => {
     console.log(`🚀 Divine Server (Unified SDK) Yayında! Port: ${PORT}`);
     console.log(`📋 Model Sıralaması: ${MODELS.join(' -> ')}`);
 });
-
