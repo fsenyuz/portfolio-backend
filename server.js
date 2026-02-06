@@ -40,8 +40,7 @@ function logUsage(ip, model, status) {
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
 // --- 4. GEMINI KURULUMU (YENİ SDK) ---
-// KRİTİK: apiVersion: 'v1' ekleyerek stable endpoint'e geçiyoruz (hataları çözer)
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, apiVersion: 'v1' });
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Startup'ta mevcut modelleri logla (Render log'larında gör)
 async function logAvailableModels() {
@@ -76,20 +75,24 @@ MANDATORY RESPONSE STYLE:
 Be helpful, professional, slightly witty. Answer in the language the user speaks (Turkish or English).
 `;
 
-// --- 6. MODEL LİSTESİ (FALLBACK MECHANISM - 2026 GÜNCEL) ---
-// Stable modellere odaklan: 2.5 serisi başa, preview sona (overloaded riski düşük)
+// --- 6. MODEL LİSTESİ (FALLBACK MECHANISM - SENİN ERİŞİMİNE GÖRE GÜNCEL) ---
+// Ekran görüntüsüne göre: Başa erişilebilir flash/lite koy, Gemma'ları fallback olarak ekle (hafif ve ücretsiz)
 const MODELS = [
-    "gemini-2.5-flash",          // Ana: Hızlı, multimodal
-    "gemini-2.5-flash-lite",     // Lite: Ekonomik
-    "gemini-2.5-pro",            // Pro: Karmaşık sorgular için
-    "gemini-3-flash-preview",    // Preview: Yeni nesil (ama overloaded olabilir)
-    "gemini-1.5-flash"           // Fallback: Stabil eski model
+    "gemini-3-flash",            // Senin listende: Gemini 3 Flash (yeni ve güçlü)
+    "gemini-2.5-flash",          // Gemini 2.5 Flash (hızlı)
+    "gemini-2.5-flash-lite",     // Gemini 2.5 Flash Lite (ekonomik)
+    "gemini-2.5-flash-tts",      // TTS varyantı (eğer metin tabanlıysa dener)
+    "gemini-robotics-er-1.5-preview", // Robotics preview (genel amaçlı dener)
+    "gemma-3-27b",               // Gemma 3 27B (açık kaynak fallback)
+    "gemma-3-12b",               // Daha hafif Gemma
+    "gemma-3-4b",                // En hafif fallback
+    "gemini-embedding-1"         // Embedding (eğer metinse dener, ama chat için son)
 ];
 
 // Health Check (Versiyon kontrolü eklendi)
 app.get('/', (req, res) => res.json({ 
     status: "Divine AI Online", 
-    version: "2026.02-fix", 
+    version: "2026.02-final-fix", 
     models: MODELS 
 }));
 
@@ -144,15 +147,15 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             try {
                 console.log(`🤖 Model deneniyor: ${modelName}`);
 
-                // YENİ SDK SYNTAX (Overload için temperature düşürüldü)
+                // YENİ SDK SYNTAX: systemInstruction contents array'ine eklendi
                 const result = await genAI.models.generateContent({
                     model: modelName,
-                    contents: [{ role: 'user', parts: parts }],
-                    config: {
-                        systemInstruction: {
-                            parts: [{ text: SYSTEM_INSTRUCTION_TEXT }]
-                        },
-                        temperature: 0.5,  // Düşürüldü: Daha stabil cevaplar
+                    contents: [
+                        { role: 'system', parts: [{ text: SYSTEM_INSTRUCTION_TEXT }] },
+                        { role: 'user', parts: parts }
+                    ],
+                    generationConfig: {  // Config -> generationConfig olarak değiştirildi
+                        temperature: 0.5,  // Düşürüldü: Stabilite için
                         maxOutputTokens: 500  // Azaltıldı: Overload riskini düşür
                     }
                 });
