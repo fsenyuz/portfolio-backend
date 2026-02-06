@@ -13,13 +13,20 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Logs klasörü yoksa oluştur (Hata almamak için)
+// API Key Kontrolü (Debug için)
+if (!process.env.GEMINI_API_KEY) {
+    console.error("🚨 HATA: GEMINI_API_KEY bulunamadı! Environment Variables kontrol et.");
+} else {
+    console.log("✅ API Key başarıyla yüklendi.");
+}
+
+// Logs klasörü yoksa oluştur
 if (!fs.existsSync('logs')) {
     fs.mkdirSync('logs');
 }
 
 // 2. GÜVENLİK VE MIDDLEWARE
-app.use(cors()); // Her yerden gelen isteklere izin ver (CORS)
+app.use(cors()); // Her yerden gelen isteklere izin ver
 app.use(express.json());
 
 // Clickjacking Koruması (Divine Shield)
@@ -29,12 +36,11 @@ app.use((req, res, next) => {
     next();
 });
 
-// 3. LOGLAMA SİSTEMİ (Günlük Dosya Tutma)
+// 3. LOGLAMA SİSTEMİ
 function logUsage(ip, model) {
     try {
-        const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD formatı
+        const date = new Date().toISOString().split('T')[0];
         const entry = `${new Date().toISOString()} | IP: ${ip} | Model: ${model}\n`;
-        // Logları dosyaya ekle
         fs.appendFile(path.join('logs', `usage-${date}.log`), entry, (err) => {
             if (err) console.error("Log Error:", err);
         });
@@ -43,19 +49,18 @@ function logUsage(ip, model) {
     }
 }
 
-// 4. DOSYA YÜKLEME AYARLARI (Multer)
+// 4. DOSYA YÜKLEME (Multer)
 const upload = multer({ 
     dest: 'uploads/',
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB Limit (Fazlasını kabul etme)
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB Limit
 });
 
 // 5. GEMINI AI KURULUMU
-// Render'daki 'GEMINI_API_KEY' buraya otomatik gelir
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const modelPro = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 const modelFlash = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-// Sistem Promptu (Botun Kişiliği)
+// Sistem Promptu
 const sysPrompt = `
 You are the AI Assistant for Furkan Senyuz's portfolio website.
 Identity: You are a helpful, professional, and slightly witty AI assistant.
@@ -69,28 +74,33 @@ Key Info:
 If asked about sensitive info (phone, address), politely decline.
 `;
 
-// 6. CHAT ROTASI (ANA İŞLEV)
-// Hem metin hem resim gelebilir
+// --- YENİ EKLENEN BÖLÜM: SAĞLIK KONTROLÜ (HEALTH CHECK) ---
+// Render linkine tıklandığında boş sayfa yerine bu mesaj çıkacak
+app.get('/', (req, res) => {
+    res.json({ 
+        status: "Online", 
+        message: "Divine API is breathing... 🧘‍♂️", 
+        owner: "Furkan Senyuz" 
+    });
+});
+
+// 6. CHAT ROTASI
 app.post('/chat', upload.single('image'), async (req, res) => {
     try {
         console.log(`[Request] Chat request from IP: ${req.ip}`);
         
-        // Kullanıcı mesajını temizle (HTML taglerini sil - Güvenlik)
         const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
         
-        // Görüntü İşleme (Eğer resim yüklendiyse)
         let imagePart = null;
         if (req.file) {
             try {
                 const optimizedPath = req.file.path + '-opt.jpg';
-                // Sharp ile resmi optimize et (Döndür, küçült, jpg yap)
                 await sharp(req.file.path)
                     .rotate()
-                    .resize(800) // Genişlik en fazla 800px olsun
+                    .resize(800)
                     .jpeg({ quality: 80 })
                     .toFile(optimizedPath);
                 
-                // Resmi Gemini'nin anlayacağı formata çevir
                 const mimeType = "image/jpeg";
                 const imageBuffer = fs.readFileSync(optimizedPath);
                 imagePart = {
@@ -100,7 +110,6 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                     }
                 };
                 
-                // İş bitti, sunucudaki geçici dosyaları sil
                 fs.unlinkSync(req.file.path);
                 fs.unlinkSync(optimizedPath);
             } catch (err) {
@@ -108,13 +117,10 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             }
         }
 
-        // Prompt Hazırlığı (Sistem Mesajı + Resim + Kullanıcı Mesajı)
         const parts = [sysPrompt, `User: ${userMsg}`];
         if (imagePart) parts.push(imagePart);
 
-        // Model Seçimi ve Yanıt (Fallback Mekanizması)
         try {
-            // Önce en zeki model (Pro) ile dene
             const result = await modelPro.generateContent(parts);
             const response = await result.response;
             const text = response.text();
@@ -124,7 +130,6 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 
         } catch (error) {
             console.warn("Pro Model Failed, switching to Flash:", error.message);
-            // Hata olursa (Kota dolarsa vb.) hızlı model (Flash) ile dene
             const result = await modelFlash.generateContent(parts);
             const response = await result.response;
             const text = response.text();
@@ -135,7 +140,6 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 
     } catch (error) {
         console.error("Server Error:", error);
-        // Kullanıcıya dostane bir hata mesajı dön
         res.status(500).json({ reply: "My circuits are overheated. Please try again later. 🤖", error: error.message });
     }
 });
