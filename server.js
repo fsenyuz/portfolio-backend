@@ -15,23 +15,27 @@ const PORT = process.env.PORT || 3000;
 
 // API Key Kontrolü
 if (!process.env.GEMINI_API_KEY) {
-    console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı!");
+    console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı! .env dosyanı kontrol et.");
+    process.exit(1);
 } else {
-    console.log("✅ API Key yüklendi (System Ready).");
+    console.log("✅ API Key yüklendi.");
 }
 
 // Logs klasörü oluştur
 if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
 // 2. MIDDLEWARE
-app.use(cors());
+app.use(cors({
+    origin: '*', // Prodüksiyonda bunu fsenyuz.com olarak kısıtlamanı öneririm
+    methods: ['GET', 'POST']
+}));
 app.use(express.json());
 
 // 3. LOGLAMA
-function logUsage(ip, model) {
+function logUsage(ip, model, status) {
     try {
         const date = new Date().toISOString().split('T')[0];
-        const entry = `${new Date().toISOString()} | IP: ${ip} | Model: ${model}\n`;
+        const entry = `${new Date().toISOString()} | IP: ${ip} | Model: ${model} | Status: ${status}\n`;
         fs.appendFile(path.join('logs', `usage-${date}.log`), entry, () => {});
     } catch (e) { console.error("Log Error:", e); }
 }
@@ -59,80 +63,90 @@ Key Info:
 If asked about sensitive info (phone, address), politely decline.
 `;
 
-// Modeli Tanımla (Flash Modelini Ana Model Yaptık)
+// --- MODEL SEÇİMİ ---
+// 2026 itibariyle kararlı sürüm tahmini: gemini-2.0-flash
+// Eğer yine 404 alırsan 'gemini-1.5-flash-latest' dene.
+const MODEL_NAME = "gemini-2.0-flash"; 
+
 const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
+    model: MODEL_NAME,
     systemInstruction: systemInstruction
 });
 
 // Health Check
-app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz" }));
+app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", model: MODEL_NAME }));
 
 // 6. CHAT ROTASI
 app.post('/chat', upload.single('image'), async (req, res) => {
+    let imagePath = null;
+    let optimizedPath = null;
+
     try {
-        console.log(`📩 Yeni Mesaj Geldi: IP ${req.ip}`);
+        console.log(`📩 Yeni Mesaj: IP ${req.ip}`);
         
         const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
         
         // Resim İşleme
         let imagePart = null;
         if (req.file) {
+            imagePath = req.file.path;
+            optimizedPath = req.file.path + '-opt.jpg';
+            
             try {
-                const optimizedPath = req.file.path + '-opt.jpg';
-                await sharp(req.file.path).rotate().resize(800).jpeg({ quality: 80 }).toFile(optimizedPath);
+                await sharp(imagePath).rotate().resize(800).jpeg({ quality: 80 }).toFile(optimizedPath);
                 imagePart = {
                     inlineData: {
                         data: fs.readFileSync(optimizedPath).toString("base64"),
                         mimeType: "image/jpeg"
                     }
                 };
-                fs.unlinkSync(req.file.path);
-                fs.unlinkSync(optimizedPath);
-            } catch (err) { console.error("Resim İşleme Hatası:", err); }
+            } catch (err) { 
+                console.error("Resim İşleme Hatası:", err);
+            }
         }
 
-        // --- GEMINI FORMAT DÜZELTMESİ (GROK REVIZESİ) ---
-        // SDK 0.21.0+ için doğru format:
-        // Sadece Metin -> String
-        // Metin + Resim -> [{ text: "..." }, { inlineData: ... }]
-        
+        // İçerik Hazırlama
         let contentToSend;
-        
         if (imagePart) {
-            // Eğer resim varsa, bir dizi (array) göndermeliyiz
-            contentToSend = [
-                { text: userMsg }, // Metni obje olarak sarıyoruz
-                imagePart          // Resmi ekliyoruz
-            ];
+            contentToSend = [{ text: userMsg }, imagePart];
         } else {
-            // Eğer sadece metin varsa, direkt string gönderebiliriz (veya yine obje olarak)
-            // Garanti olsun diye tek elemanlı dizi olarak gönderelim
             contentToSend = [{ text: userMsg }];
         }
 
         // Yapay Zekaya Sor
-        console.log("🤖 Gemini Flash Düşünüyor...");
+        console.log(`🤖 Gemini (${MODEL_NAME}) Düşünüyor...`);
         const result = await model.generateContent(contentToSend);
         const response = await result.response;
         const text = response.text();
         
-        console.log("✅ Cevap Üretildi.");
-        logUsage(req.ip, 'FLASH');
-        res.json({ reply: text, model: 'flash' });
+        console.log("✅ Cevap Başarılı.");
+        logUsage(req.ip, MODEL_NAME, 'SUCCESS');
+        res.json({ reply: text, model: MODEL_NAME });
 
     } catch (error) {
-        console.error("🚨 SERVER HATASI (Detaylı):", error);
+        console.error("🚨 SERVER HATASI:", error.message);
+        logUsage(req.ip, MODEL_NAME, 'ERROR');
+
+        // Hata Detaylarını Analiz Et
+        let userReply = "Bağlantıda küçük bir sorun oldu. Lütfen tekrar dene. 🤖";
         
-        if (error.response) {
-            console.error("Google API Hatası:", JSON.stringify(error.response, null, 2));
+        if (error.message.includes("404") || error.message.includes("Not Found")) {
+            console.error("❌ HATA: Model bulunamadı. Lütfen server.js içindeki MODEL_NAME değişkenini kontrol et.");
+            userReply = "Sistem şu anda bakımda (Model Upgrade). Lütfen daha sonra tekrar dene.";
+        } else if (error.message.includes("429")) {
+            userReply = "Çok fazla istek geldi, biraz bekleyip tekrar dene.";
         }
-        
+
         res.status(500).json({ 
-            reply: "Bağlantıda küçük bir sorun oldu. Lütfen tekrar dene. 🤖", 
+            reply: userReply, 
             error: error.message 
         });
+
+    } finally {
+        // Temizlik: Geçici dosyaları sil
+        if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+        if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Divine Server ${PORT} portunda çalışıyor!`));
+app.listen(PORT, () => console.log(`🚀 Divine Server ${PORT} portunda çalışıyor! Model: ${MODEL_NAME}`));
