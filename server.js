@@ -70,10 +70,7 @@ Be helpful, professional, slightly witty. Answer in the language the user speaks
 const MODELS = [
     "gemini-3-flash",            // Senin listende Gemini 3 Flash (çalışmalı)
     "gemini-2.5-flash",          // Gemini 2.5 Flash
-    "gemini-2.5-flash-lite",     // Gemini 2.5 Flash Lite
-    "gemini-2.5-flash-tts",      // TTS varyantı (metin için dener)
-    "gemma-3-27b",               // Gemma 3 27B (açık kaynak fallback)
-    "gemma-3-12b"                // Hafif Gemma fallback
+    "gemini-2.5-flash-lite"    // Gemini 2.5 Flash Lite
 ];
 
 // Health Check (Versiyon kontrolü eklendi)
@@ -187,3 +184,4 @@ app.listen(PORT, () => {
     console.log(`🚀 Divine Server (Unified SDK) Yayında! Port: ${PORT}`);
     console.log(`📋 Model Sıralaması: ${MODELS.join(' -> ')}`);
 });
+
