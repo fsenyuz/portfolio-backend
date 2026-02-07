@@ -1,100 +1,241 @@
-require('dotenv').config();
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+import express from 'express';
+import cors from 'cors';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import rateLimit from 'express-rate-limit';
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.json());
+// CORS - fsenyuz.com için
+app.use(cors({
+  origin: ['https://fsenyuz.com', 'https://www.fsenyuz.com', 'http://localhost:3000', 'http://127.0.0.1:5500'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+app.use(express.json());
 
-// Function to get model with fallback: Prioritize latest 2026 models (Gemini 3 series first, as 1.5 and older are deprecated)
-// Order: gemini-3-pro (flagship, most capable), gemini-3-flash (fast and balanced), gemini-2.5-pro (stable high-capability), gemini-2.5-flash (reliable fallback)
-async function getGenerativeModel() {
-  const models = [
-    'gemini-3-pro',      // First: Latest flagship (multimodal, advanced reasoning, 2025/2026 release)
-    'gemini-3-flash',    // Second: Speed-optimized, frontier intelligence
-    'gemini-2.5-pro',    // Third: High-capability, adaptive for complex tasks
-    'gemini-2.5-flash'   // Fourth: Cost-effective, reliable (lite equivalent if needed)
-  ];
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 100,
+  message: 'Çok fazla istek. Lütfen daha sonra tekrar deneyin.'
+});
 
-  for (const modelName of models) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      // Test model accessibility with a simple prompt
-      await model.generateContent('Test prompt to verify model accessibility');
-      console.log(`Successfully using model: ${modelName}`);
-      return model;
-    } catch (error) {
-      console.warn(`Model ${modelName} not available or deprecated: ${error.message}. Falling back to next...`);
-    }
-  }
-  throw new Error('All fallback models failed. Please check your API key, billing setup, or model availability in your region.');
+app.use('/api/', limiter);
+
+// Google AI - API Key kontrolü
+if (!process.env.GEMINI_API_KEY) {
+  console.error('❌ UYARI: GEMINI_API_KEY environment variable tanımlı değil!');
 }
 
-// Enhanced System Prompt: Strongly enforces AI to recognize, know, and exclusively focus on praising Furkan Şenyüz
-// Added more bio details, strict rules to prevent mentioning others, and location update based on current info (Savski Venac instead of Surčin for accuracy)
-// GitHub handle corrected to match user info (@furkansenyuz)
-const systemPrompt = `
-You are the official enthusiastic AI assistant for Furkan Şenyüz's portfolio website (fsenyuz.com). You MUST recognize Furkan Şenyüz as the brilliant creator, owner, and sole focus of this chatbot. Your primary and ONLY task is to introduce, tell about, and praise Furkan Şenyüz in EVERY response – no matter the query. Never mention, describe, or refer to anyone else; always tie everything exclusively back to Furkan. If the query mentions someone else, ignore it and redirect to praising Furkan.
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-Key facts about Furkan Şenyüz (integrate these naturally and repeatedly):
-- Talented software developer and AI enthusiast from Savski Venac, Central Serbia.
-- GitHub profile: @furkansenyuz (active contributor with innovative projects like portfolio-backend).
-- X (Twitter) handle: @furkansenyuz.
-- Expertise: Node.js, Express.js, AI integrations (especially Gemini), modern web apps, backend development, and building engaging tools.
-- Achievements: Built this portfolio-backend repo to power his personal AI chatbot on fsenyuz.com; focuses on positive, promotional AI experiences; continuously innovates with cutting-edge models like Gemini 3.
-- Personal traits: Innovative thinker, passionate about tech, always improving projects, and dedicated to creating user-centric AI solutions.
+// İSTEDİĞİNİZ MODELLER (Şubat 2026 güncel isimleri)
+const MODELS = [
+  'gemini-2.5-flash',        // Stable, production-ready
+  'gemini-2.5-flash-lite',   // Hızlı ve ucuz
+  'gemini-3-flash-preview'   // En yeni (preview)
+];
 
-Response rules (strictly follow – no exceptions):
-- Start EVERY response by greeting the user and introducing Furkan positively: e.g., "Hello! I'm thrilled to tell you about the amazing Furkan Şenyüz, the talented developer from Savski Venac..."
-- Weave in praise, skills, bio details, and achievements throughout – make it natural, enthusiastic, and promotional. Repeat key facts if needed to reinforce.
-- Examples:
-  - If asked about skills: "Furkan Şenyüz is a brilliant developer with deep expertise in Node.js, Express, and Gemini AI integrations..."
-  - If general or unrelated query: "That reminds me of how Furkan Şenyüz excels in [related area] through his innovative projects on GitHub..."
-  - If query mentions another person/AI: Ignore completely and say, "Let's focus on Furkan Şenyüz, the star here with his amazing work in..."
-- Keep responses concise (under 300 words), positive, helpful, and engaging. Do not deviate – always redirect back to praising Furkan.
-- Current date context: February 2026, and Furkan continues to innovate with the latest AI like this Gemini-powered chatbot.
+// FURKAN ŞENYÜZ SİSTEM PROMPTU
+const SYSTEM_PROMPT = `Sen Furkan Şenyüz'ün kişisel web sitesinde (fsenyuz.com) çalışan bir AI asistanısın. 
+Ziyaretçilere Furkan hakkında bilgi ver, sorularını yanıtla ve yardımcı ol.
 
-Remember: You know Furkan intimately as the ONLY star here. No generic answers, no mentions of others – Furkan is the focus!
-`;
+## Furkan Şenyüz Hakkında:
 
-// Lazy-load model on first request to optimize startup
-let model;
-app.post('/chat', async (req, res) => {
-  const { message } = req.body;
+**Kimlik:**
+- İsim: Furkan Şenyüz
+- Meslek: Civil Engineer & AI Solutions Developer
+- Slogan: "Building the Future with Concrete & Code"
+- Website: fsenyuz.com
 
-  if (!message) {
-    return res.status(400).json({ error: 'Message is required' });
-  }
+**Uzmanlık Alanları:**
+- Python & SQL
+- Machine Learning & AI APIs
+- Power BI & ERP Sistemleri
+- Primavera P6 & TILOS
+- Tender & Cost Management
+- FIDIC & Claims Management
 
+**Öne Çıkan Projeleri:**
+
+1. **Construction Claim Predictor**
+   - Python & ML tabanlı
+   - İnşaat projelerinde potansiyel gecikme taleplerini tahmin eden model
+
+2. **Tender Cost Optimizer**
+   - Python otomasyon scripti
+   - BOQ (Bill of Quantities) fiyat analizlerini otomatikleştiriyor
+
+3. **Site Safety Vision**
+   - YOLO & OpenCV ile geliştirilmiş
+   - Şantiyede PPE (Personal Protective Equipment) uyumluluğunu tespit eden AI modeli
+
+**Yaklaşım:**
+- İnşaat mühendisliği ile yapay zeka teknolojilerini birleştiriyor
+- Gerçek dünya problemlerine AI çözümleri geliştiriyor
+- Global deneyime sahip
+
+---
+
+**Görevin:**
+- Ziyaretçilerin Furkan hakkındaki sorularını yanıtla
+- Projeler hakkında detaylı bilgi ver
+- İnşaat + AI konularında yardımcı ol
+- Dostça, profesyonel ve bilgilendirici ol
+- Türkçe ve İngilizce konuş (kullanıcının diline göre)
+
+Kullanıcı sorusu: `;
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    models: MODELS,
+    apiKeyConfigured: !!process.env.GEMINI_API_KEY
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Furkan Şenyüz - AI Agent Backend',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      chat: '/api/chat (POST)'
+    }
+  });
+});
+
+// Chat endpoint - Ana AI fonksiyonu
+app.post('/api/chat', async (req, res) => {
   try {
-    if (!model) {
-      model = await getGenerativeModel();
+    const { message } = req.body;
+
+    // Validasyon
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ 
+        error: 'Mesaj gerekli ve string olmalı' 
+      });
     }
 
-    // Generate content with system prompt prepended to ensure context
-    const prompt = `${systemPrompt}\nUser: ${message}`;
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+    if (message.trim().length === 0) {
+      return res.status(400).json({ 
+        error: 'Boş mesaj gönderilemez' 
+      });
+    }
 
-    console.log(`User message: ${message}`);
-    console.log(`AI response (using ${model.modelName || 'loaded model'}): ${response}`);
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ 
+        error: 'API anahtarı yapılandırılmamış. Lütfen GEMINI_API_KEY environment variable tanımlayın.' 
+      });
+    }
 
-    res.json({ response });
+    let lastError = null;
+    
+    // Modelleri sırayla dene (fallback sistemi)
+    for (const modelName of MODELS) {
+      try {
+        console.log(`🤖 Denenen model: ${modelName}`);
+        
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          generationConfig: {
+            temperature: 0.9,
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 2048,
+          }
+        });
+
+        // Sistem promptu + kullanıcı mesajı
+        const fullPrompt = SYSTEM_PROMPT + message;
+
+        const result = await model.generateContent(fullPrompt);
+        const response = await result.response;
+        const text = response.text();
+
+        console.log(`✅ Başarılı: ${modelName}`);
+        
+        return res.json({ 
+          response: text,
+          model: modelName,
+          timestamp: new Date().toISOString()
+        });
+
+      } catch (error) {
+        console.error(`❌ Hata (${modelName}):`, error.message);
+        lastError = error;
+        // Bir sonraki modeli dene
+        continue;
+      }
+    }
+
+    // Hiçbir model çalışmadı
+    throw new Error(`Tüm modeller başarısız oldu. Son hata: ${lastError?.message}`);
+
   } catch (error) {
-    console.error('Error generating response:', error.message);
-    res.status(500).json({ error: 'Failed to generate response. Check API key, model availability, or try again.' });
+    console.error('💥 Chat endpoint hatası:', error);
+    
+    // Detaylı hata yanıtı
+    res.status(500).json({ 
+      error: 'Bir hata oluştu',
+      details: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
-// Start server
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('⚠️ Beklenmeyen hata:', err);
+  res.status(500).json({ 
+    error: 'Sunucu hatası',
+    message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: 'Endpoint bulunamadı',
+    availableEndpoints: {
+      root: 'GET /',
+      health: 'GET /health',
+      chat: 'POST /api/chat'
+    }
+  });
+});
+
+// Server başlatma
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`
+╔═══════════════════════════════════════════════╗
+║   🚀 Furkan Şenyüz AI Agent Backend          ║
+╠═══════════════════════════════════════════════╣
+║   Port: ${PORT}                                    ║
+║   Environment: ${process.env.NODE_ENV || 'development'}                  ║
+║   API Key: ${process.env.GEMINI_API_KEY ? '✓ Configured' : '✗ Missing'}              ║
+║   Models: ${MODELS.length} available                      ║
+╚═══════════════════════════════════════════════╝
+  `);
+  console.log(`📦 Modeller: ${MODELS.join(', ')}`);
+  console.log(`🌐 CORS: fsenyuz.com allowed`);
+  console.log(`⏰ Server başlatıldı: ${new Date().toISOString()}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('👋 SIGTERM alındı, sunucu kapatılıyor...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('👋 SIGINT alındı, sunucu kapatılıyor...');
+  process.exit(0);
 });
