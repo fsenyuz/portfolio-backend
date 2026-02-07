@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: fsenyuz-ai-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false  # Render dashboard'dan manuel eklenecek
