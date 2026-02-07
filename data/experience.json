@@ -1,0 +1,50 @@
+[
+  { 
+    "key": "exp1", 
+    "cat": "civil", 
+    "company": "Tasyapi Construction", 
+    "loc": "Kuzmin, Serbia", 
+    "date": "2024 – Present", 
+    "subtext": "Kuzmin-Sremska Raca Highway (€ 345M)" 
+  },
+  { 
+    "key": "exp2", 
+    "cat": "civil", 
+    "company": "Tasyapi Construction", 
+    "loc": "Belgrade, Serbia", 
+    "date": "2021 – 2024", 
+    "subtext": null 
+  },
+  { 
+    "key": "exp3", 
+    "cat": "civil", 
+    "company": "Fernas Group", 
+    "loc": "Aydın, Turkey", 
+    "date": "Jan 2021 – Aug 2021", 
+    "subtext": "Aydin-Denizli Motorway (€ 1.13B)" 
+  },
+  { 
+    "key": "exp4", 
+    "cat": "civil", 
+    "company": "Limak Group", 
+    "loc": "Çanakkale, Turkey", 
+    "date": "Aug 2019 – Dec 2019", 
+    "subtext": "1915 Çanakkale Bridge Project" 
+  },
+  { 
+    "key": "exp5", 
+    "cat": "civil", 
+    "company": "Limak Group", 
+    "loc": "Kocaeli, Turkey", 
+    "date": "Jan 2018 – Aug 2019", 
+    "subtext": "Northern Marmara Motorway ($500M)" 
+  },
+  { 
+    "key": "exp6", 
+    "cat": "civil", 
+    "company": "Mat Yapi Group", 
+    "loc": "Istanbul, Turkey", 
+    "date": "Dec 2016 – Jan 2018", 
+    "subtext": null 
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "construction-claim-predictor": { 
+    "ready": true, 
+    "url": "https://github.com/fsenyuz/construction-claim-predictor" 
+  },
+  "tender-cost-optimizer": { 
+    "ready": true, 
+    "url": "https://github.com/fsenyuz/tender-cost-optimizer" 
+  },
+  "site-safety-vision": { 
+    "ready": false, 
+    "comingSoon": true,
+    "url": "https://github.com/fsenyuz/site-safety-vision" 
+  }
+}

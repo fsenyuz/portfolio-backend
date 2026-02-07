@@ -1,0 +1,11 @@
+[
+  { "key": "edu1", "cat": "ai", "company": "Stanford University (Andrew Ng)", "loc": "Online", "date": "2026 (Expected)", "badge": null },
+  { "key": "edu2", "cat": "ai", "company": "University of Michigan", "loc": "Online", "date": "Jan 2026", "badge": null },
+  { "key": "edu3", "cat": "civil", "company": "Istanbul Technical University (ITU)", "loc": "Istanbul", "date": "Nov 2023", "badge": null },
+  { "key": "edu_itu_claim", "cat": "civil", "company": "Istanbul Technical University (ITU)", "loc": "Istanbul", "date": "Apr 2023", "badge": null },
+  { "key": "edu4", "cat": "civil", "company": "Grid Group / TILOS", "loc": "Istanbul", "date": "Feb 2019", "badge": null },
+  { "key": "edu5", "cat": "civil", "company": "Akım Mühendislik (Oracle Partner)", "loc": "Istanbul", "date": "Jan 2018", "badge": null },
+  { "key": "edu6", "cat": "civil", "company": "Leiden University", "loc": "Online", "date": "Certification", "badge": null },
+  { "key": "edu7", "cat": "civil", "company": "Mugla Sitki Kocman University", "loc": "Turkey", "date": "2016 – Present", "badge": null },
+  { "key": "edu8", "cat": "civil", "company": "Mugla Sitki Kocman University", "loc": "Turkey", "date": "2011 – 2016", "badge": null }
+]
