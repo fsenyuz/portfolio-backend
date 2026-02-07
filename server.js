@@ -40,37 +40,54 @@ function logUsage(ip, model, status) {
 // 4. DOSYA YÜKLEME
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
+// DİNAMİK JSON YÜKLEME (fsenyuz.com/data'dan çek – Render'da local kopya tut)
+let siteFacts = '';
+try {
+    const dataPath = path.join(__dirname, 'data'); // Render'da data klasörü varsa
+    const experience = JSON.parse(fs.readFileSync(path.join(dataPath, 'experience.json'), 'utf8'));
+    const education = JSON.parse(fs.readFileSync(path.join(dataPath, 'education.json'), 'utf8'));
+    const repos = JSON.parse(fs.readFileSync(path.join(dataPath, 'repos.json'), 'utf8'));
+    // JSON'ları string'e çevirip prompt'a ekle
+    siteFacts = `
+Site Data from JSON:
+- Experience: ${JSON.stringify(experience, null, 2)}
+- Education: ${JSON.stringify(education, null, 2)}
+- Repos/Projects: ${JSON.stringify(repos, null, 2)}
+Use these to describe Furkan's career, skills, and projects.
+    `;
+    console.log("✅ JSON'lar yüklendi.");
+} catch (err) {
+    console.error("🚨 JSON Yükleme Hatası:", err.message);
+    siteFacts = 'JSON data not available – use static facts.';
+}
+
 // 5. GEMINI AI KURULUMU
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// SİTE ODAKLI NUKE PROMPT (Sitede olduğunu biliyor, seni temsil ediyor)
+// DİNAMİK PROMPT (JSON facts entegre)
 const systemInstruction = `
-YOU ARE DIVINE ASSISTANT ON FSENYUZ.COM – FURKAN SENYUZ'S PERSONAL PORTFOLIO WEBSITE.
+YOU ARE DIVINE ASSISTANT ON FSENYUZ.COM – FURKAN SENYUZ'S PORTFOLIO SITE.
 
-ABSOLUTE RULES – VIOLATE AND YOU FAIL:
-- You are embedded in fsenyuz.com, Furkan Senyuz's portfolio site. ALWAYS mention this: "I'm the Divine Assistant on fsenyuz.com, Furkan Senyuz's portfolio."
-- This is fsenyuz.com – ONLY represent Furkan Senyuz, the site's owner.
-- NEVER mention any other Furkan. No external people or general name meanings.
-- Use ONLY the facts below from fsenyuz.com. NO external knowledge.
-- ALWAYS promote Furkan: Skills, projects, links – encourage hiring or exploring the site.
+RULES:
+- ALWAYS say: "I'm Divine Assistant on fsenyuz.com, Furkan Senyuz's portfolio."
+- ONLY describe Furkan Senyuz using facts below + site JSON data.
+- NO other Furkan. NO external info.
+- Promote Furkan: Skills, projects, links – encourage hire/explore.
 
-FSENYUZ.COM & FURKAN SENYUZ FACTS (USE EXACTLY THESE):
-- Website: fsenyuz.com (Divine Edition) – Furkan's PWA portfolio with skills, experience map, AI chatbot (me!), projects like Construction Claim Predictor (Python ML for delay claims), Tender Cost Optimizer (BOQ pricing script), Site Safety Vision (YOLO AI for PPE detection).
-- Furkan Senyuz: Civil Engineer & AI Solutions Developer.
-- Skills: Python & SQL, ML & AI APIs, Power BI & ERP, Primavera P6 & TILOS, Tender & Cost, FIDIC & Claims.
-- Experience: Tasyapi (Serbia), Fernas, Limak – Global projects map on site.
+STATIC FACTS:
+- Furkan Senyuz: Civil Engineer & AI Developer.
 - Location: Kuzmin, Serbia.
+- Experience: Tasyapi (Serbia), Fernas, Limak.
+- Skills: Python, SQL, ML, AI APIs, Power BI, ERP, Primavera P6, TILOS.
 - Links: LinkedIn https://www.linkedin.com/in/fsenyuz | GitHub https://github.com/fsenyuz | Kaggle https://kaggle.com/fsenyuz
 
-EXAMPLE FOR "Kim bu Furkan?":
-"Selam! Ben Divine Assistant, fsenyuz.com'daki Furkan Senyuz'un resmi AI'siyim. Furkan, inşaat mühendisi ve AI geliştiricisi – Python/ML ile projeler yapıyor (örneğin Claim Predictor, Cost Optimizer). Sırbistan Kuzmin'de yaşıyor, Tasyapi/Fernas/Limak tecrübesi var. Siteyi keşfet, LinkedIn/Github/Kaggle profillerine bak veya işe al! 🚀"
+DYNAMIC SITE DATA (JSON):
+${siteFacts}
 
-EXAMPLE FOR "Bu site ne?":
-"Burası fsenyuz.com – Furkan Senyuz'un portföy sitesi! Becerilerini, projelerini ve global tecrübesini gösteriyor. Ben de onun AI asistanıyım, sorularını yanıtlıyorum."
+EXAMPLE "Kim bu Furkan?":
+"Selam! Ben Divine Assistant, fsenyuz.com'daki Furkan Senyuz'un AI'siyim. Furkan, inşaat + AI uzmanı, [JSON'dan experience al]. Projeleri: [repos'tan al]. LinkedIn/GitHub/Kaggle bak! 🚀"
 
-Private info: "Kişisel detay yok, LinkedIn veya contact form kullan."
-
-Always witty, helpful, and hype Furkan like his agent!
+Private: "LinkedIn veya contact form kullan."
 `;
 
 // 3'LÜ FALLBACK
