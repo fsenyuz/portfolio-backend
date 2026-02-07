@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const sharp = require('sharp');
-const { GoogleGenAI } = require('@google/genai'); // Güncel paket
+const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
 const path = require('path');
 const sanitizeHtml = require('sanitize-html');
@@ -37,7 +37,7 @@ function logUsage(ip, model, status) {
 // Dosya yükleme
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
-// data.json okuma ve system instruction
+// data.json okuma ve system instruction (STRING olarak - daha stabil)
 let systemInstruction = "";
 
 try {
@@ -82,23 +82,22 @@ try {
     4. Speak the language of the user (Turkish or English) based on their input.
     `;
 
-    // System instruction'ı parts formatına çeviriyoruz (güncel API için güvenli)
-    systemInstruction = { parts: [{ text: systemInstruction }] };
-
     console.log("✅ AI Hafızası (System Instruction) yüklendi.");
 
 } catch (err) {
     console.error("🚨 VERİ YÜKLEME HATASI:", err.message);
-    systemInstruction = { parts: [{ text: "You are an AI assistant for Furkan Senyuz. Furkan is a Civil Engineer & AI Developer." }] };
+    systemInstruction = "You are an AI assistant for Furkan Senyuz. Furkan is a Civil Engineer & AI Developer.";
 }
 
 // Gemini kurulumu
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Orijinal model listen (fallback sırasıyla dene)
+// Güvenli model listesi (orijinalini korudum + çalışan fallback'ler ekledim)
 const MODELS = [
-    "gemini-3-flash-preview",
-    "gemini-2.5-flash",
+    "gemini-1.5-flash",        // En stabil ve hızlı
+    "gemini-1.5-pro",          // Daha güçlü (eğer kota varsa)
+    "gemini-2.5-flash",        // Senin orijinalin
+    "gemini-3-flash-preview",  // Preview varsa çalışır
     "gemini-2.5-flash-lite"
 ];
 
@@ -117,14 +116,18 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 
     try {
         console.log(`📩 Mesaj alındı: IP ${req.ip}`);
-        const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
+        const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] }).trim();
+        if (!userMsg && !req.file) throw new Error("Mesaj veya resim yok");
 
-        let parts = [{ text: userMsg }];
+        const contents = [{
+            role: 'user',
+            parts: [{ text: userMsg }]
+        }];
 
         if (req.file) {
             imagePath = req.file.path;
             const imageBuffer = await sharp(imagePath).resize(800).jpeg({ quality: 80 }).toBuffer();
-            parts.push({
+            contents[0].parts.push({
                 inlineData: {
                     data: imageBuffer.toString("base64"),
                     mimeType: "image/jpeg"
@@ -132,14 +135,8 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             });
         }
 
-        const contents = [{
-            role: 'user',
-            parts: parts
-        }];
-
         let finalReply = null;
 
-        // Modelleri sırayla dene
         for (const modelName of MODELS) {
             try {
                 usedModel = modelName;
@@ -147,12 +144,13 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 
                 const response = await genAI.models.generateContent({
                     model: modelName,
-                    systemInstruction: systemInstruction,
+                    systemInstruction: systemInstruction,  // String olarak
                     contents: contents
                 });
 
-                finalReply = response.text(); // Güncel SDK'de response.text() dönüyor
-                
+                // GÜNCEL: response.text (function değil!)
+                finalReply = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || "Yanıt alınamadı.";
+
                 console.log(`✅ Başarılı: ${usedModel}`);
                 logUsage(req.ip, usedModel, 'SUCCESS');
                 break;
@@ -162,7 +160,9 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             }
         }
 
-        if (!finalReply) throw new Error("Hiçbir model yanıt veremedi.");
+        if (!finalReply || finalReply.includes("Yanıt alınamadı")) {
+            throw new Error("Hiçbir model yanıt veremedi.");
+        }
 
         res.json({ reply: finalReply, model: usedModel });
 
