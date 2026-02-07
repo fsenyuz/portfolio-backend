@@ -8,161 +8,163 @@ const fs = require('fs');
 const path = require('path');
 const sanitizeHtml = require('sanitize-html');
 
+// 1. AYARLAR
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// API Key kontrol
+// API Key Kontrolü
 if (!process.env.GEMINI_API_KEY) {
-    console.error("🚨 KRİTİK HATA: GEMINI_API_KEY eksik!");
+    console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı!");
     process.exit(1);
 }
-console.log("✅ GEMINI_API_KEY yüklendi.");
 
-// Logs klasörü
+// Logs klasörü oluştur
 if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
-// Middleware
+// 2. MIDDLEWARE
 app.use(cors({ origin: '*', methods: ['GET', 'POST'] }));
 app.use(express.json());
 
-// Loglama
+// 3. LOGLAMA
 function logUsage(ip, model, status) {
     try {
         const date = new Date().toISOString().split('T')[0];
         const entry = `${new Date().toISOString()} | IP: ${ip} | Model: ${model} | Status: ${status}\n`;
-        fs.appendFileSync(path.join('logs', `usage-${date}.log`), entry);
-    } catch (e) {
-        console.error("Log hatası:", e);
-    }
+        fs.appendFile(path.join('logs', `usage-${date}.log`), entry, () => {});
+    } catch (e) { console.error("Log Error:", e); }
 }
 
-// Dosya yükleme
+// 4. DOSYA YÜKLEME
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
-// TEK DATA.JSON YÜKLEME
-let siteFacts = '';
+// 5. DATA.JSON OKUMA VE SYSTEM INSTRUCTION OLUŞTURMA
+let systemInstructionText = "";
+
 try {
-    const dataFilePath = path.join(__dirname, 'data.json');
-    const data = JSON.parse(fs.readFileSync(dataFilePath, 'utf8'));
+    // data.json dosyasını bul (root dizinde veya data klasöründe)
+    let rawData = null;
+    const possiblePaths = [
+        path.join(__dirname, 'data.json'),
+        path.join(__dirname, 'data', 'data.json')
+    ];
 
-    siteFacts = `
-DINAMIK SITE VERILERI (FURKAN'I TANITIRKEN MUTLAKA BUNLARI KULLAN):
+    for (let p of possiblePaths) {
+        if (fs.existsSync(p)) {
+            rawData = fs.readFileSync(p, 'utf8');
+            console.log(`✅ Veri seti bulundu: ${p}`);
+            break;
+        }
+    }
 
-- Experience: ${JSON.stringify(data.experience, null, 2)}
-- Education: ${JSON.stringify(data.education, null, 2)}
-- Locations (harita): ${JSON.stringify(data.locations, null, 2)}
-- Repos/Projects: ${JSON.stringify(data.repos, null, 2)}
-- Translations (dil desteği): ${JSON.stringify(data.translations, null, 2)}
+    if (!rawData) throw new Error("data.json bulunamadı!");
 
-Bu verileri kullanarak Furkan'ın kariyerini, projelerini, eğitimini ve global deneyimini detaylı anlat. Repoları tanıt, LinkedIn/GitHub linklerini ver, işe alım için teşvik et.
+    const portfolioData = JSON.parse(rawData);
+
+    // JSON verilerini temiz bir stringe döküyoruz
+    // NOT: data.json içindeki yapın: { education: [], experience: [], repos: {}, locations: [], translations: {} }
+    const contextData = {
+        Experience: portfolioData.experience,
+        Education: portfolioData.education,
+        Projects: portfolioData.repos,
+        Locations: portfolioData.locations,
+        Skills_Translations: portfolioData.translations
+    };
+
+    systemInstructionText = `
+    ROLE: You are the "Divine Assistant" on fsenyuz.com, Furkan Senyuz's portfolio website.
+    
+    MISSION: Promote Furkan Senyuz. Use the DATA below to answer questions about his career, projects, and skills.
+    
+    OFFICIAL DATA SOURCE (Use this to answer):
+    ${JSON.stringify(contextData, null, 2)}
+
+    RULES:
+    1. Only use the provided JSON data. Do not hallucinate.
+    2. If the user asks "Who is Furkan?", summarize his role as Civil Engineer & AI Developer.
+    3. Be professional, slightly technical, and enthusiastic.
+    4. Speak the language of the user (Turkish or English) based on their input.
     `;
-    console.log("✅ data.json başarıyla yüklendi ve prompt'a entegre edildi!");
+    
+    console.log("✅ AI Hafızası (System Instruction) yüklendi.");
+
 } catch (err) {
-    console.error("🚨 data.json yükleme hatası:", err.message);
-    siteFacts = 'Dinamik veri yüklenemedi. Sadece statik bilgiler kullanılacak.';
+    console.error("🚨 VERİ YÜKLEME HATASI:", err.message);
+    systemInstructionText = "You are an AI assistant for Furkan Senyuz. I cannot access the full database right now. Furkan is a Civil Engineer & AI Developer.";
 }
 
-// Gemini kurulumu
+// 6. GEMINI AI KURULUMU
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Güncel modeller (fallback sırasıyla)
+// SENİN BELİRLEDİĞİN MODELLER (Orijinal Listen)
 const MODELS = [
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-1.0-pro"
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite"
 ];
 
-// System prompt (daha güçlü hale getirildi)
-const systemInstruction = `
-SEN FSENYUZ.COM'DAKI DIVINE ASSISTANT'SIN – FURKAN ŞENYÜZ'ÜN PORTFOLYO SITESININ AI ASISTANI.
+// Health Check
+app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", active_models: MODELS }));
 
-KATI KURALLAR:
-- Her cevaba şu şekilde başla: "Ben fsenyuz.com'daki Divine Assistant'ım, Furkan Şenyüz'ün AI asistanıyım."
-- Furkan'ı TANITIRKEN sadece aşağıdaki statik bilgiler + dinamik JSON verilerini (${siteFacts}) kullan. Başka hiçbir şey uydurma.
-- Kullanıcının mesaj dilini tespit et ve aynı dilde cevap ver (Türkçe → tr, Sırpça → sr, İngilizce → en çevirileri kullan).
-- Furkan'ı her fırsatta öv, deneyimlerini, eğitimlerini, AI projelerini detaylı anlat, GitHub repolarını tanıt, LinkedIn'e yönlendir.
-- Siteyi keşfetmeye, iletişim formunu kullanmaya teşvik et.
-
-STATIK BILGILER:
-- Furkan Şenyüz: İnşaat Mühendisi & AI Geliştirici.
-- Konum: Kuzmin, Sırbistan.
-- Yetkinlikler: Python, SQL, Machine Learning, AI API'leri, Power BI, Primavera P6, TILOS, FIDIC sözleşmeleri.
-- Linkler: LinkedIn https://www.linkedin.com/in/fsenyuz | GitHub https://github.com/fsenyuz | Kaggle https://kaggle.com/fsenyuz
-
-ÖRNEK (Türkçe soru):
-"Kendini tanıt" → "Ben fsenyuz.com'daki Divine Assistant'ım... Furkan şu an Tasyapi'de €345M otoyol projesinde Teknik Ofis Şefi... Stanford ML sertifikası var... GitHub'da construction-claim-predictor reposuna bakabilirsin vs."
-`;
-
-// Health check
-app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", models: MODELS }));
-
-// Chat endpoint
+// 7. CHAT ROTASI
 app.post('/chat', upload.single('image'), async (req, res) => {
     let imagePath = null;
-    let optimizedPath = null;
     let usedModel = null;
 
     try {
-        console.log(`📩 Yeni istek – IP: ${req.ip}`);
+        console.log(`📩 Mesaj: IP ${req.ip}`);
         const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
-
-        let contents = [];
+        
         let imagePart = null;
-
         if (req.file) {
             imagePath = req.file.path;
-            optimizedPath = req.file.path + '-opt.jpg';
-            await sharp(imagePath)
-                .rotate()
-                .resize(800)
-                .jpeg({ quality: 80 })
-                .toFile(optimizedPath);
+            const imageBuffer = await sharp(imagePath).resize(800).jpeg({ quality: 80 }).toBuffer();
             imagePart = {
                 inlineData: {
-                    data: fs.readFileSync(optimizedPath).toString("base64"),
+                    data: imageBuffer.toString("base64"),
                     mimeType: "image/jpeg"
                 }
             };
         }
 
-        if (userMsg) contents.push({ role: 'user', parts: [{ text: userMsg }] });
-        if (imagePart) {
-            if (contents.length === 0) contents.push({ role: 'user', parts: [] });
-            contents[contents.length - 1].parts.push(imagePart);
-        }
+        let contents = [{ role: 'user', parts: [{ text: userMsg }] }];
+        if (imagePart) contents[0].parts.push(imagePart);
 
-        let lastError = null;
+        let finalReply = null;
+
+        // Modelleri sırayla dene
         for (const modelName of MODELS) {
-            usedModel = modelName;
             try {
-                console.log(`🤖 ${modelName} deniyor...`);
-                const response = await genAI.models.generateContent({
-                    model: modelName,
-                    contents,
-                    generationConfig: { systemInstruction }
+                usedModel = modelName;
+                console.log(`🤖 Model deneniyor: ${usedModel}`);
+                
+                const model = genAI.getGenerativeModel({ 
+                    model: usedModel,
+                    systemInstruction: systemInstructionText // <-- İŞTE BURASI ÖNEMLİ: Veriyi modele burada veriyoruz
                 });
-                const text = response.text;
 
-                logUsage(req.ip, modelName, 'SUCCESS');
-                return res.json({ reply: text, model: modelName });
+                const result = await model.generateContent({ contents });
+                finalReply = result.response.text();
+                
+                console.log(`✅ Başarılı: ${usedModel}`);
+                logUsage(req.ip, usedModel, 'SUCCESS');
+                break; 
             } catch (err) {
-                lastError = err;
-                console.error(`🚨 ${modelName} hatası:`, err.message);
-                logUsage(req.ip, modelName, 'ERROR');
+                console.error(`⚠️ ${usedModel} Hatası: ${err.message}`);
+                continue; // Bir sonraki modele geç
             }
         }
-        throw lastError || new Error("Tüm modeller başarısız.");
+
+        if (!finalReply) throw new Error("Hiçbir model yanıt veremedi.");
+
+        res.json({ reply: finalReply, model: usedModel });
 
     } catch (error) {
-        console.error("🚨 Genel hata:", error.message);
-        logUsage(req.ip, usedModel || 'unknown', 'ERROR');
-        res.status(500).json({ reply: "Şu an yoğunluk var veya kota doldu. Lütfen biraz sonra tekrar dene 🤖" });
+        console.error("🚨 SERVER HATASI:", error.message);
+        res.status(500).json({ reply: "Bağlantı hatası. Lütfen tekrar dene." });
     } finally {
-        [imagePath, optimizedPath].forEach(p => p && fs.existsSync(p) && fs.unlinkSync(p));
+        if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Divine Server ${PORT} portunda çalışıyor! Modeller: ${MODELS.join(', ')}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server ${PORT} portunda çalışıyor. Modeller: ${MODELS.join(', ')}`));
