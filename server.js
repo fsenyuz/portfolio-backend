@@ -3,7 +3,8 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const sharp = require('sharp');
-const { GoogleGenAI } = require('@google/genai');
+// DİKKAT: Yeni SDK importu bu şekildedir
+const { GoogleGenAI } = require('@google/genai'); 
 const fs = require('fs');
 const path = require('path');
 const sanitizeHtml = require('sanitize-html');
@@ -19,7 +20,7 @@ if (!process.env.GEMINI_API_KEY) {
     process.exit(1);
 }
 
-// Logs klasörü oluştur
+// Logs klasörü
 if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
 // 2. MIDDLEWARE
@@ -43,10 +44,9 @@ const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } 
 // ---------------------------------------------------------
 let siteFacts = '';
 try {
-    // Backend klasöründeki 'data' klasörünü hedefler
-    const dataPath = path.join(__dirname, 'data'); 
+    const dataPath = path.join(__dirname, 'data');
     
-    // Dosyaların varlığını kontrol ederek oku (Hata almamak için)
+    // Güvenli dosya okuma fonksiyonu
     const readJson = (fname) => {
         const f = path.join(dataPath, fname);
         return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '{}';
@@ -57,7 +57,6 @@ try {
     const repos = readJson('repos.json');
     const locations = readJson('locations.json');
     
-    // Translations dosyasından sadece İngilizce kısmını alıyoruz
     let translations = '{}';
     const transRaw = readJson('translations.json');
     if(transRaw !== '{}') {
@@ -65,7 +64,6 @@ try {
         translations = JSON.stringify(parsed['en'] || {});
     }
 
-    // AI'ın Hafızasını Oluşturuyoruz
     siteFacts = `
     *** DYNAMIC DATA SOURCE (Use this to answer) ***
     - Professional Experience: ${experience}
@@ -74,47 +72,46 @@ try {
     - Work Locations: ${locations}
     - Site Terminology: ${translations}
     `;
-    
     console.log("✅ JSON Verileri Hafızaya Yüklendi!");
 } catch (err) {
     console.error("🚨 JSON Yükleme Uyarısı:", err.message);
     siteFacts = 'Data files not found. Rely on static context.';
 }
 
-// 5. GEMINI AI KURULUMU
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// 5. GEMINI AI KURULUMU (YENİ SDK)
+// Yeni SDK'da client doğrudan oluşturulur
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// SİSTEM TALİMATI (Grok'un mantığı + Benim Grounding Korumam)
-const systemInstruction = `
+// SİSTEM TALİMATI
+const systemInstructionText = `
 You are the "Divine Assistant" on fsenyuz.com, the portfolio of Furkan Senyuz.
 
-🚨 **ABSOLUTE IDENTITY RULES (DO NOT BREAK):**
-1. **IGNORE** any external information about other people named "Furkan Senyuz" (e.g. journalists, reality show contestants). They are NOT the user.
+🚨 **ABSOLUTE IDENTITY RULES:**
+1. **IGNORE** any external information about "Furkan Senyuz" (journalists, reality stars, etc.).
 2. **THE USER** is a Civil Engineer & AI Solutions Developer based in Kuzmin, Serbia.
-3. **SOURCE OF TRUTH:** You must answer ALL questions about Furkan, his skills, or his projects using ONLY the "DYNAMIC DATA SOURCE" provided below.
+3. **SOURCE OF TRUTH:** Answer ALL questions using ONLY the "DYNAMIC DATA SOURCE" below.
 
 ${siteFacts}
 
-**BEHAVIOR GUIDELINES:**
+**BEHAVIOR:**
 - **Tone:** Professional, slightly witty, helpful.
-- **Language:** Detect the user's language (Turkish, English, Serbian) and reply in the SAME language.
-- **Goal:** Promote Furkan's skills. If they ask about code, refer to the 'Repos'. If they ask about construction, refer to 'Experience'.
-- **Privacy:** If asked for phone number or home address, politely refer them to the Contact Form or LinkedIn.
+- **Language:** Detect user's language and reply in the SAME language.
+- **Privacy:** Redirect sensitive info requests to Contact Form.
 
-**EXAMPLE INTERACTION:**
+**EXAMPLE:**
 User: "Furkan kim?"
-You: "Furkan Şenyüz, Sırbistan'da yaşayan bir İnşaat Mühendisi ve Yapay Zeka Geliştiricisidir. Tasyapi ve Fernas gibi firmalarda çalışmış, şu anda inşaat verilerini Python ile analiz eden projeler geliştirmektedir."
+You: "Furkan Şenyüz, Sırbistan'da yaşayan bir İnşaat Mühendisi ve AI Geliştiricisidir. [experience.json] verilerine göre..."
 `;
 
-// 3'LÜ FALLBACK LİSTESİ
+// MODEL LİSTESİ (Yeni SDK ile uyumlu model isimleri)
 const MODELS = [
-    "gemini-2.0-flash-exp", // Veya "gemini-1.5-pro" (Daha güçlü modelleri başa koy)
+    "gemini-2.0-flash-exp", 
     "gemini-1.5-flash",
     "gemini-1.5-flash-8b"
 ];
 
 // Health Check
-app.get('/', (req, res) => res.json({ status: "Divine Server Online", owner: "Furkan Senyuz", loaded_data: siteFacts.length > 100 }));
+app.get('/', (req, res) => res.json({ status: "Divine Server Online", sdk: "@google/genai", models: MODELS }));
 
 // 6. CHAT ROTASI
 app.post('/chat', upload.single('image'), async (req, res) => {
@@ -133,6 +130,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             optimizedPath = req.file.path + '-opt.jpg';
             try {
                 await sharp(imagePath).rotate().resize(800).jpeg({ quality: 80 }).toFile(optimizedPath);
+                // Yeni SDK formatı için inlineData hazırlığı
                 imagePart = {
                     inlineData: {
                         data: fs.readFileSync(optimizedPath).toString("base64"),
@@ -142,9 +140,10 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             } catch (err) { console.error("Resim Hatası:", err); }
         }
 
-        let contents = [];
-        if (userMsg) contents.push({ role: 'user', parts: [{ text: userMsg }] });
-        if (imagePart) contents[contents.length - 1].parts.push(imagePart);
+        // İçerik Hazırlığı
+        let contentParts = [];
+        if (userMsg) contentParts.push({ text: userMsg });
+        if (imagePart) contentParts.push(imagePart);
 
         // Fallback Loop
         let error = null;
@@ -153,19 +152,22 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             try {
                 console.log(`🤖 Model: ${usedModel}`);
                 
-                // --- İŞTE KRİTİK DÜZELTME BURASI ---
-                // System Instruction'ı model OLUŞTURULURKEN veriyoruz.
-                // Grok bunu generateContent içine koymuştu, o riskli.
-                const model = genAI.getGenerativeModel({ 
+                // --- YENİ SDK KULLANIMI (DÜZELTİLEN KISIM) ---
+                // getGenerativeModel YERİNE ai.models.generateContent kullanıyoruz.
+                const response = await ai.models.generateContent({
                     model: usedModel,
-                    systemInstruction: systemInstruction 
+                    contents: [{ role: 'user', parts: contentParts }],
+                    config: {
+                        // System Instruction buraya, 'config' içine gelmeli!
+                        systemInstruction: systemInstructionText,
+                        temperature: 0.7,
+                    }
                 });
-
-                const response = await model.generateContent({
-                    contents
-                });
+                // ----------------------------------------------
                 
-                const text = response.text;
+                // Yeni SDK yanıt yapısı bazen farklı olabilir, text() metodu genellikle vardır.
+                const text = response.text; 
+                
                 console.log(`✅ Başarılı: ${usedModel}`);
                 logUsage(req.ip, usedModel, 'SUCCESS');
                 return res.json({ reply: text, model: usedModel });
@@ -173,7 +175,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             } catch (err) {
                 error = err;
                 console.error(`⚠️ Hata (${usedModel}): ${err.message}`);
-                // 429 vb değilse devam et
+                // 404 (Model yok) veya 429 (Kota) hatalarında devam et
             }
         }
         throw error || new Error("Modeller cevap veremedi.");
@@ -187,4 +189,4 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Divine Server (JSON Powered) ${PORT} portunda çalışıyor!`));
+app.listen(PORT, () => console.log(`🚀 Divine Server (New SDK) ${PORT} portunda çalışıyor!`));
