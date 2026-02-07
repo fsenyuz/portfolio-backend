@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// API Key kontrolü
+// API Key
 const API_KEY = process.env.GEMINI_API_KEY;
 if (!API_KEY) {
   console.error('❌ GEMINI_API_KEY bulunamadı!');
@@ -17,8 +17,12 @@ if (!API_KEY) {
 
 const genAI = new GoogleGenerativeAI(API_KEY || 'dummy');
 
-// Modeller
-const MODELS = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+// ✅ DOĞRU MODELLER (Google AI Studio)
+const MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-3-flash-preview'
+];
 
 // Sistem promptu
 const SYSTEM_PROMPT = `Sen Furkan Şenyüz'ün portfolio sitesi AI asistanısın.
@@ -36,7 +40,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK',
     apiKey: !!API_KEY,
-    models: MODELS
+    models: MODELS,
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -44,7 +49,8 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Furkan Senyuz AI Backend',
-    status: 'running'
+    status: 'running',
+    version: '1.0.0'
   });
 });
 
@@ -61,32 +67,75 @@ app.post('/api/chat', async (req, res) => {
       return res.status(500).json({ error: 'API key eksik' });
     }
 
-    // Modelleri dene
+    let lastError = null;
+
+    // Modelleri sırayla dene
     for (const modelName of MODELS) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
+        console.log(`🤖 Denenen: ${modelName}`);
+        
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          generationConfig: {
+            temperature: 0.9,
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 2048,
+          }
+        });
+
         const result = await model.generateContent(SYSTEM_PROMPT + message);
         const response = await result.response;
         
+        console.log(`✅ Başarılı: ${modelName}`);
+        
         return res.json({ 
           response: response.text(),
-          model: modelName
+          model: modelName,
+          timestamp: new Date().toISOString()
         });
+
       } catch (err) {
-        console.log(`Model ${modelName} başarısız: ${err.message}`);
+        console.error(`❌ ${modelName}: ${err.message}`);
+        lastError = err;
         continue;
       }
     }
 
-    throw new Error('Tüm modeller başarısız');
+    // Hiçbir model çalışmadı
+    throw new Error(`Tüm modeller başarısız: ${lastError?.message}`);
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('💥 Chat hatası:', error);
+    res.status(500).json({ 
+      error: 'Bir hata oluştu',
+      details: error.message 
+    });
   }
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint bulunamadı' });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('⚠️ Hata:', err);
+  res.status(500).json({ error: 'Sunucu hatası' });
 });
 
 // Server başlat
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server çalışıyor: ${PORT}`);
-  console.log(`🔑 API Key: ${API_KEY ? 'Var' : 'Yok'}`);
+  console.log(`
+╔════════════════════════════════════════╗
+║  🚀 Furkan Şenyüz AI Backend          ║
+╠════════════════════════════════════════╣
+║  Port: ${PORT}                              ║
+║  API Key: ${API_KEY ? '✓' : '✗'}                       ║
+║  Models: ${MODELS.length}                           ║
+╚════════════════════════════════════════╝
+  `);
+  console.log(`📦 Modeller:`);
+  MODELS.forEach(m => console.log(`   - ${m}`));
 });
