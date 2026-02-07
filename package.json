@@ -1,7 +1,7 @@
 {
   "name": "portfolio-backend",
   "version": "1.0.0",
-  "type": "module",    ← BU ÇOK ÖNEMLİ!
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
