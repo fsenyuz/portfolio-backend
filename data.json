@@ -11,58 +11,16 @@
     { "key": "edu8", "cat": "civil", "company": "Mugla Sitki Kocman University", "loc": "Turkey", "date": "2011 – 2016", "badge": null }
   ],
   "experience": [
-    { 
-      "key": "exp1", 
-      "cat": "civil", 
-      "company": "Tasyapi Construction", 
-      "loc": "Kuzmin, Serbia", 
-      "date": "2024 – Present", 
-      "subtext": "Kuzmin-Sremska Raca Highway (€ 345M)" 
-    },
-    { 
-      "key": "exp2", 
-      "cat": "civil", 
-      "company": "Tasyapi Construction", 
-      "loc": "Belgrade, Serbia", 
-      "date": "2021 – 2024", 
-      "subtext": null 
-    },
-    { 
-      "key": "exp3", 
-      "cat": "civil", 
-      "company": "Fernas Group", 
-      "loc": "Aydın, Turkey", 
-      "date": "Jan 2021 – Aug 2021", 
-      "subtext": "Aydin-Denizli Motorway (€ 1.13B)" 
-    },
-    { 
-      "key": "exp4", 
-      "cat": "civil", 
-      "company": "Limak Group", 
-      "loc": "Çanakkale, Turkey", 
-      "date": "Aug 2019 – Dec 2019", 
-      "subtext": "1915 Çanakkale Bridge Project" 
-    },
-    { 
-      "key": "exp5", 
-      "cat": "civil", 
-      "company": "Limak Group", 
-      "loc": "Kocaeli, Turkey", 
-      "date": "Jan 2018 – Aug 2019", 
-      "subtext": "Northern Marmara Motorway ($500M)" 
-    },
-    { 
-      "key": "exp6", 
-      "cat": "civil", 
-      "company": "Mat Yapi Group", 
-      "loc": "Istanbul, Turkey", 
-      "date": "Dec 2016 – Jan 2018", 
-      "subtext": null 
-    }
+    { "key": "exp1", "cat": "civil", "company": "Tasyapi Construction", "loc": "Kuzmin, Serbia", "date": "2024 – Present", "subtext": "Kuzmin-Sremska Raca Highway (€ 345M)" },
+    { "key": "exp2", "cat": "civil", "company": "Tasyapi Construction", "loc": "Belgrade, Serbia", "date": "2021 – 2024", "subtext": null },
+    { "key": "exp3", "cat": "civil", "company": "Fernas Group", "loc": "Aydın, Turkey", "date": "Jan 2021 – Aug 2021", "subtext": "Aydin-Denizli Motorway (€ 1.13B)" },
+    { "key": "exp4", "cat": "civil", "company": "Limak Group", "loc": "Çanakkale, Turkey", "date": "Aug 2019 – Dec 2019", "subtext": "1915 Çanakkale Bridge Project" },
+    { "key": "exp5", "cat": "civil", "company": "Limak Group", "loc": "Kocaeli, Turkey", "date": "Jan 2018 – Aug 2019", "subtext": "Northern Marmara Motorway ($500M)" },
+    { "key": "exp6", "cat": "civil", "company": "Mat Yapi Group", "loc": "Istanbul, Turkey", "date": "Dec 2016 – Jan 2018", "subtext": null }
   ],
   "locations": [
     {"t":"Kuzmin", "lat":45.02, "lng":19.40, "ty":"work", "desc": "Tasyapi Construction"},
-    {"t":"Belgrade (HQ)", "lat":44.78, "lng":20.44, "ty":"work", "desc": "Tasyapi Construction", "zIndex": 1000},
+    {"t":"Belgrade (HQ)", "lat":44.78, "lng":20.44, "ty":"work", "desc": "Tasyapi Construction"},
     {"t":"Aydin", "lat":37.83, "lng":27.84, "ty":"work", "desc": "Fernas Group"},
     {"t":"Canakkale", "lat":40.15, "lng":26.41, "ty":"work", "desc": "1915 Bridge"},
     {"t":"Kocaeli", "lat":40.85, "lng":29.88, "ty":"work", "desc": "Northern Marmara Motorway"},
@@ -84,21 +42,6 @@
     {"t":"Kosovo", "lat":42.60, "lng":20.90, "ty":"tender", "desc": "Road Tender"},
     {"t":"Macedonia", "lat":41.60, "lng":21.74, "ty":"tender", "desc": "Highway Tender"}
   ],
-  "repos": {
-    "construction-claim-predictor": { 
-      "ready": true, 
-      "url": "https://github.com/fsenyuz/construction-claim-predictor" 
-    },
-    "tender-cost-optimizer": { 
-      "ready": true, 
-      "url": "https://github.com/fsenyuz/tender-cost-optimizer" 
-    },
-    "site-safety-vision": { 
-      "ready": false, 
-      "comingSoon": true,
-      "url": "https://github.com/fsenyuz/site-safety-vision" 
-    }
-  },
   "translations": {
     "en": {
       "contactBtn": "Let's Connect",
