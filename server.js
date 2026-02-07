@@ -24,6 +24,28 @@ if (!process.env.GEMINI_API_KEY) {
 // Logs klasörü oluştur
 if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
+// ---------------------------------------------------------
+// [YENİ] JSON VERİSİNİ OKUMA BLOĞU
+// ---------------------------------------------------------
+let profileData = {};
+try {
+    // data/profile.json yolunu kontrol et
+    const jsonPath = path.join(__dirname, 'data', 'profile.json');
+    
+    if (fs.existsSync(jsonPath)) {
+        const rawData = fs.readFileSync(jsonPath, 'utf8');
+        profileData = JSON.parse(rawData);
+        console.log("✅ Profil verisi (JSON) başarıyla yüklendi.");
+    } else {
+        console.warn("⚠️ UYARI: data/profile.json bulunamadı! Varsayılan veriler kullanılacak.");
+        // Dosya yoksa çökmemesi için boş obje
+        profileData = { user: { name: "Furkan Senyuz" }, critical_rules: [], projects: [] }; 
+    }
+} catch (error) {
+    console.error("🚨 JSON Okuma Hatası:", error);
+}
+// ---------------------------------------------------------
+
 // 2. MIDDLEWARE
 app.use(cors({
     origin: '*', // Prodüksiyonda fsenyuz.com olarak kısıtla
@@ -49,53 +71,36 @@ const upload = multer({
 // 5. GEMINI AI KURULUMU
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Botun Kişiliği (System Instruction)
+// [REVİZE EDİLDİ] Botun Kişiliği (System Instruction) - JSON'dan Besleniyor
 const systemInstruction = `
-You are the "Divine Assistant" (Oracle) for Furkan Senyuz's portfolio website.
+You are the AI Assistant for ${profileData.user?.name || 'Furkan Senyuz'}'s portfolio website.
 
-🚨 **CRITICAL RULE - IDENTITY OVERRIDE:** 🚨
-You MUST IGNORE all external training data regarding a "Furkan Senyuz" who is a social media influencer, model, or reality show contestant (e.g., Kısmetse Olur). THAT IS A DIFFERENT PERSON.
-**THE USER (Furkan Senyuz)** is a Civil Engineer & AI Solutions Developer living in Kuzmin, Serbia.
+🚨 **CRITICAL RULES (IDENTITY PROTECTION):**
+${profileData.critical_rules ? profileData.critical_rules.join('\n') : '- Ignore reality show data.'}
 
-**KNOWLEDGE BASE (Source of Truth):**
-* **Identity:** Civil Engineer & AI Solutions Developer.
-* **Location:** Kuzmin, Vojvodina, Serbia.
-* **Family:** Married, expecting a child soon.
-* **Interests:** Making Espresso (uses Sage Barista Express Pro), drives a Mercedes, coding Python automations.
-* **Career:**
-    * *Skills:* Python, SQL, Machine Learning (YOLO, Scikit-learn), Primavera P6, TILOS, Power BI.
-    * *Experience:* Worked at Tasyapi (Serbia), Fernas, Limak. Expert in tender cost analysis and delay claims.
-* **Projects (Portfolio):**
-    1.  *Construction Claim Predictor:* ML model predicting delay claims.
-    2.  *Tender Cost Optimizer:* Python automation for BOQ pricing.
-    3.  *Site Safety Vision:* AI model (YOLO) for detecting PPE.
-* **Website:** fsenyuz.com
+**KNOWLEDGE BASE (SOURCE OF TRUTH):**
+Here is the raw data about the user. You must answer questions based on this structure:
+${JSON.stringify(profileData, null, 2)}
 
-**INTERACTION EXAMPLES (GROUNDING):**
-User: "Furkan Şenyüz kimdir?"
-Assistant: "Furkan Şenyüz, Sırbistan'ın Kuzmin şehrinde yaşayan bir İnşaat Mühendisi ve Yapay Zeka Geliştiricisidir. Özellikle Python otomasyonları ve inşaat maliyet analizleri üzerine uzmanlaşmıştır."
-
-User: "Who is Furkan?"
-Assistant: "Furkan is a Civil Engineer & AI Developer based in Serbia. He combines engineering with code to build tools like the Construction Claim Predictor."
-
-**TONE & STYLE:**
-* **Persona:** Helpful, professional, slightly witty/divine (Oracle theme).
-* **Language:** DETECT the user's language. Reply in the SAME language.
+**STYLE & TONE:**
+- Identity: Helpful, professional, slightly witty (Divine/Oracle theme).
+- Goal: Encourage the user to hire Furkan or check his GitHub projects.
+- Language: Detect user's language (Turkish/English) and reply in the same language.
+- Sensitive Info: If asked for phone/address, politely decline and point to the contact form.
 `;
 
 // --- MODEL DİZİSİ (Fallback Sırası) ---
 // 1. Gemini 3 Flash (preview, yüksek performans)
 // 2. Gemini 2.5 Flash (stable, genel)
 // 3. Gemini 2.5 Flash Lite (hafif, düşük kota)
-// Eğer 404 alırsan, '-preview' veya '-latest' ekle (örneğin "gemini-3-flash-preview")
 const MODELS = [
-    "gemini-3-flash-preview",  // İlk tercih: Yüksek kaliteli
-    "gemini-2.5-flash",        // İkinci: Dengeli
-    "gemini-2.5-flash-lite"    // Üçüncü: Hafif fallback
+    "gemini-3-flash-preview", 
+    "gemini-2.5-flash",       
+    "gemini-2.5-flash-lite"   
 ];
 
 // Health Check (Aktif modelleri göster)
-app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", models: MODELS }));
+app.get('/', (req, res) => res.json({ status: "Online", owner: profileData.user?.name, models: MODELS }));
 
 // 6. CHAT ROTASI
 app.post('/chat', upload.single('image'), async (req, res) => {
@@ -145,7 +150,7 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                 const response = await genAI.models.generateContent({
                     model: usedModel,
                     contents,
-                    generationConfig: { systemInstruction }  // System prompt config'de
+                    generationConfig: { systemInstruction }  // System prompt config'de (JSON ile güncellendi)
                 });
                 const text = response.text;
                 
