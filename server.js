@@ -82,8 +82,8 @@ ${JSON.stringify(profileData, null, 2)}
 
 // SENİN MODEL LİSTEN (Dokunmadım)
 const MODELS = [
-    "gemini-3-flash-preview", 
-    "gemini-2.5-flash",       
+    "gemini-2.5-flash",  
+    "gemini-3-flash-preview",      
     "gemini-2.5-flash-lite"   
 ];
 
