@@ -94,8 +94,6 @@ const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Güvenli model listesi (orijinalini korudum + çalışan fallback'ler ekledim)
 const MODELS = [
-    "gemini-1.5-flash",        // En stabil ve hızlı
-    "gemini-1.5-pro",          // Daha güçlü (eğer kota varsa)
     "gemini-2.5-flash",        // Senin orijinalin
     "gemini-3-flash-preview",  // Preview varsa çalışır
     "gemini-2.5-flash-lite"
