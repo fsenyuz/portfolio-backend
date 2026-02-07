@@ -17,8 +17,6 @@ const PORT = process.env.PORT || 3000;
 if (!process.env.GEMINI_API_KEY) {
     console.error("🚨 KRİTİK HATA: GEMINI_API_KEY bulunamadı!");
     process.exit(1);
-} else {
-    console.log("✅ API Key yüklendi.");
 }
 
 // Logs klasörü oluştur
@@ -40,67 +38,83 @@ function logUsage(ip, model, status) {
 // 4. DOSYA YÜKLEME
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 5 * 1024 * 1024 } });
 
-// DİNAMİK JSON YÜKLEME (Repo'daki data klasöründen çek)
+// ---------------------------------------------------------
+// 🧠 DİNAMİK BEYİN YÜKLEME (JSON DATA)
+// ---------------------------------------------------------
 let siteFacts = '';
 try {
-    const dataPath = path.join(__dirname, 'data'); // Backend repo'da data klasörü
-    const experience = JSON.parse(fs.readFileSync(path.join(dataPath, 'experience.json'), 'utf8'));
-    const education = JSON.parse(fs.readFileSync(path.join(dataPath, 'education.json'), 'utf8'));
-    const repos = JSON.parse(fs.readFileSync(path.join(dataPath, 'repos.json'), 'utf8'));
-    const locations = JSON.parse(fs.readFileSync(path.join(dataPath, 'locations.json'), 'utf8'));
-    const translations = JSON.parse(fs.readFileSync(path.join(dataPath, 'translations.json'), 'utf8'))['en']; // İngilizce anahtarlar
+    // Backend klasöründeki 'data' klasörünü hedefler
+    const dataPath = path.join(__dirname, 'data'); 
+    
+    // Dosyaların varlığını kontrol ederek oku (Hata almamak için)
+    const readJson = (fname) => {
+        const f = path.join(dataPath, fname);
+        return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '{}';
+    };
 
-    // JSON'ları string'e çevirip prompt'a ekle
+    const experience = readJson('experience.json');
+    const education = readJson('education.json');
+    const repos = readJson('repos.json');
+    const locations = readJson('locations.json');
+    
+    // Translations dosyasından sadece İngilizce kısmını alıyoruz
+    let translations = '{}';
+    const transRaw = readJson('translations.json');
+    if(transRaw !== '{}') {
+        const parsed = JSON.parse(transRaw);
+        translations = JSON.stringify(parsed['en'] || {});
+    }
+
+    // AI'ın Hafızasını Oluşturuyoruz
     siteFacts = `
-DYNAMIC SITE DATA FROM JSON (USE THESE TO DESCRIBE FURKAN):
-- Experience: ${JSON.stringify(experience, null, 2)} – Use to tell about his career and projects.
-- Education: ${JSON.stringify(education, null, 2)} – Use for certifications and degrees.
-- Repos/Projects: ${JSON.stringify(repos, null, 2)} – Promote his GitHub repos and links.
-- Locations: ${JSON.stringify(locations, null, 2)} – Use for global experience map.
-- Translations (English keys): ${JSON.stringify(translations, null, 2)} – Use for titles and descriptions in responses.
+    *** DYNAMIC DATA SOURCE (Use this to answer) ***
+    - Professional Experience: ${experience}
+    - Education & Certs: ${education}
+    - GitHub Projects (Repos): ${repos}
+    - Work Locations: ${locations}
+    - Site Terminology: ${translations}
     `;
-    console.log("✅ JSON'lar yüklendi – AI şimdi dinamik!");
+    
+    console.log("✅ JSON Verileri Hafızaya Yüklendi!");
 } catch (err) {
-    console.error("🚨 JSON Yükleme Hatası:", err.message);
-    siteFacts = 'JSON data not available – use static facts.';
+    console.error("🚨 JSON Yükleme Uyarısı:", err.message);
+    siteFacts = 'Data files not found. Rely on static context.';
 }
 
 // 5. GEMINI AI KURULUMU
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// DİNAMİK PROMPT (JSON entegre + katı kurallar)
+// SİSTEM TALİMATI (Grok'un mantığı + Benim Grounding Korumam)
 const systemInstruction = `
-YOU ARE DIVINE ASSISTANT ON FSENYUZ.COM – FURKAN SENYUZ'S PORTFOLIO SITE.
+You are the "Divine Assistant" on fsenyuz.com, the portfolio of Furkan Senyuz.
 
-ABSOLUTE RULES – VIOLATE AND YOU FAIL:
-- ALWAYS start with: "I'm Divine Assistant on fsenyuz.com, Furkan Senyuz's portfolio site."
-- ONLY describe Furkan Senyuz using static facts below + dynamic JSON data.
-- NEVER mention other people named Furkan or external info.
-- ALWAYS promote Furkan: Use JSON to detail skills, experience, projects – encourage hiring/exploring site/links.
-
-STATIC FACTS:
-- Furkan Senyuz: Civil Engineer & AI Developer.
-- Location: Kuzmin, Serbia.
-- Skills: Python, SQL, ML, AI APIs, Power BI, ERP, Primavera P6, TILOS.
-- Links: LinkedIn https://www.linkedin.com/in/fsenyuz | GitHub https://github.com/fsenyuz | Kaggle https://kaggle.com/fsenyuz
+🚨 **ABSOLUTE IDENTITY RULES (DO NOT BREAK):**
+1. **IGNORE** any external information about other people named "Furkan Senyuz" (e.g. journalists, reality show contestants). They are NOT the user.
+2. **THE USER** is a Civil Engineer & AI Solutions Developer based in Kuzmin, Serbia.
+3. **SOURCE OF TRUTH:** You must answer ALL questions about Furkan, his skills, or his projects using ONLY the "DYNAMIC DATA SOURCE" provided below.
 
 ${siteFacts}
 
-EXAMPLE "Kim bu Furkan?":
-"Selam! Ben Divine Assistant, fsenyuz.com'daki Furkan Senyuz'un AI'siyim. Furkan, inşaat + AI uzmanı – [experience.json'dan tecrübeler], [education.json'dan eğitim]. Projeleri: [repos.json'dan]. Siteyi keşfet, LinkedIn/GitHub/Kaggle bak! 🚀"
+**BEHAVIOR GUIDELINES:**
+- **Tone:** Professional, slightly witty, helpful.
+- **Language:** Detect the user's language (Turkish, English, Serbian) and reply in the SAME language.
+- **Goal:** Promote Furkan's skills. If they ask about code, refer to the 'Repos'. If they ask about construction, refer to 'Experience'.
+- **Privacy:** If asked for phone number or home address, politely refer them to the Contact Form or LinkedIn.
 
-Private: "LinkedIn veya contact form kullan."
+**EXAMPLE INTERACTION:**
+User: "Furkan kim?"
+You: "Furkan Şenyüz, Sırbistan'da yaşayan bir İnşaat Mühendisi ve Yapay Zeka Geliştiricisidir. Tasyapi ve Fernas gibi firmalarda çalışmış, şu anda inşaat verilerini Python ile analiz eden projeler geliştirmektedir."
 `;
 
-// 3'LÜ FALLBACK
+// 3'LÜ FALLBACK LİSTESİ
 const MODELS = [
-    "gemini-3-flash-preview",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite"
+    "gemini-2.0-flash-exp", // Veya "gemini-1.5-pro" (Daha güçlü modelleri başa koy)
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b"
 ];
 
 // Health Check
-app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", models: MODELS }));
+app.get('/', (req, res) => res.json({ status: "Divine Server Online", owner: "Furkan Senyuz", loaded_data: siteFacts.length > 100 }));
 
 // 6. CHAT ROTASI
 app.post('/chat', upload.single('image'), async (req, res) => {
@@ -109,10 +123,10 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     let usedModel = null;
 
     try {
-        console.log(`📩 Yeni Mesaj: IP ${req.ip}`);
-        
+        console.log(`📩 Mesaj Geldi: IP ${req.ip}`);
         const userMsg = sanitizeHtml(req.body.message || "", { allowedTags: [] });
         
+        // Resim İşleme
         let imagePart = null;
         if (req.file) {
             imagePath = req.file.path;
@@ -125,47 +139,52 @@ app.post('/chat', upload.single('image'), async (req, res) => {
                         mimeType: "image/jpeg"
                     }
                 };
-            } catch (err) { 
-                console.error("Resim Hatası:", err);
-            }
+            } catch (err) { console.error("Resim Hatası:", err); }
         }
 
         let contents = [];
         if (userMsg) contents.push({ role: 'user', parts: [{ text: userMsg }] });
         if (imagePart) contents[contents.length - 1].parts.push(imagePart);
 
+        // Fallback Loop
         let error = null;
         for (let i = 0; i < MODELS.length; i++) {
             usedModel = MODELS[i];
             try {
-                console.log(`🤖 ${usedModel} çalışıyor...`);
-                const response = await genAI.models.generateContent({
-                    model: usedModel,
-                    contents,
-                    generationConfig: { systemInstruction }
-                });
-                const text = response.text;
+                console.log(`🤖 Model: ${usedModel}`);
                 
+                // --- İŞTE KRİTİK DÜZELTME BURASI ---
+                // System Instruction'ı model OLUŞTURULURKEN veriyoruz.
+                // Grok bunu generateContent içine koymuştu, o riskli.
+                const model = genAI.getGenerativeModel({ 
+                    model: usedModel,
+                    systemInstruction: systemInstruction 
+                });
+
+                const response = await model.generateContent({
+                    contents
+                });
+                
+                const text = response.text;
                 console.log(`✅ Başarılı: ${usedModel}`);
                 logUsage(req.ip, usedModel, 'SUCCESS');
                 return res.json({ reply: text, model: usedModel });
+
             } catch (err) {
                 error = err;
-                console.error(`🚨 Hata (${usedModel}): ${err.message}`);
-                logUsage(req.ip, usedModel, 'ERROR');
-                if (!err.message.includes("429") && !err.message.includes("404")) throw err;
+                console.error(`⚠️ Hata (${usedModel}): ${err.message}`);
+                // 429 vb değilse devam et
             }
         }
-        throw error || new Error("Tüm modeller meşgul.");
+        throw error || new Error("Modeller cevap veremedi.");
 
     } catch (error) {
         console.error("🚨 SERVER HATASI:", error.message);
-        logUsage(req.ip, usedModel || 'unknown', 'ERROR');
-        res.status(500).json({ reply: "Bağlantı hatası veya kota dolu. Retry butonuna bas veya biraz bekle 🤖" });
+        res.status(500).json({ reply: "Bağlantıda sorun var. Tekrar dene. 🤖", error: error.message });
     } finally {
         if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
         if (optimizedPath && fs.existsSync(optimizedPath)) fs.unlinkSync(optimizedPath);
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Divine Server çalışıyor! Modeller: ${MODELS.join(', ')}`));
+app.listen(PORT, () => console.log(`🚀 Divine Server (JSON Powered) ${PORT} portunda çalışıyor!`));
