@@ -3,7 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const sharp = require('sharp');
-const { GoogleGenAI } = require('@google/genai');  // Yeni unified SDK
+const { GoogleGenAI } = require('@google/genai');  // Yeni SDK
 const fs = require('fs');
 const path = require('path');
 const sanitizeHtml = require('sanitize-html');
@@ -24,31 +24,9 @@ if (!process.env.GEMINI_API_KEY) {
 // Logs klasörü oluştur
 if (!fs.existsSync('logs')) fs.mkdirSync('logs');
 
-// ---------------------------------------------------------
-// [YENİ] JSON VERİSİNİ OKUMA BLOĞU
-// ---------------------------------------------------------
-let profileData = {};
-try {
-    // data/profile.json yolunu kontrol et
-    const jsonPath = path.join(__dirname, 'data', 'profile.json');
-    
-    if (fs.existsSync(jsonPath)) {
-        const rawData = fs.readFileSync(jsonPath, 'utf8');
-        profileData = JSON.parse(rawData);
-        console.log("✅ Profil verisi (JSON) başarıyla yüklendi.");
-    } else {
-        console.warn("⚠️ UYARI: data/profile.json bulunamadı! Varsayılan veriler kullanılacak.");
-        // Dosya yoksa çökmemesi için boş obje
-        profileData = { user: { name: "Furkan Senyuz" }, critical_rules: [], projects: [] }; 
-    }
-} catch (error) {
-    console.error("🚨 JSON Okuma Hatası:", error);
-}
-// ---------------------------------------------------------
-
 // 2. MIDDLEWARE
 app.use(cors({
-    origin: '*', // Prodüksiyonda fsenyuz.com olarak kısıtla
+    origin: '*', // Prodüksiyonda bunu fsenyuz.com olarak kısıtlamanı öneririm
     methods: ['GET', 'POST']
 }));
 app.use(express.json());
@@ -71,42 +49,32 @@ const upload = multer({
 // 5. GEMINI AI KURULUMU
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// [REVİZE EDİLDİ] Botun Kişiliği (System Instruction) - JSON'dan Besleniyor
+// Botun Kişiliği (System Instruction) - Yeni SDK'de generateContent içinde geçer
 const systemInstruction = `
-You are the AI Assistant for ${profileData.user?.name || 'Furkan Senyuz'}'s portfolio website.
-
-🚨 **CRITICAL RULES (IDENTITY PROTECTION):**
-${profileData.critical_rules ? profileData.critical_rules.join('\n') : '- Ignore reality show data.'}
-
-**KNOWLEDGE BASE (SOURCE OF TRUTH):**
-Here is the raw data about the user. You must answer questions based on this structure:
-${JSON.stringify(profileData, null, 2)}
-
-**STYLE & TONE:**
-- Identity: Helpful, professional, slightly witty (Divine/Oracle theme).
-- Goal: Encourage the user to hire Furkan or check his GitHub projects.
-- Language: Detect user's language (Turkish/English) and reply in the same language.
-- Sensitive Info: If asked for phone/address, politely decline and point to the contact form.
+You are the AI Assistant for Furkan Senyuz's portfolio website.
+Identity: You are a helpful, professional, and slightly witty AI assistant.
+Knowledge: You know that Furkan is a Civil Engineer & AI Solutions Developer.
+Style: Be concise, engaging, and encourage the user to hire Furkan or look at his projects.
+Key Info:
+- Furkan combines Civil Engineering with Python/AI.
+- He worked at Tasyapi (Serbia), Fernas, Limak.
+- He knows Python, SQL, Primavera P6, TILOS.
+- Current location: Kuzmin, Serbia.
+If asked about sensitive info (phone, address), politely decline.
 `;
 
-// --- MODEL DİZİSİ (Fallback Sırası) ---
-// 1. Gemini 3 Flash (preview, yüksek performans)
-// 2. Gemini 2.5 Flash (stable, genel)
-// 3. Gemini 2.5 Flash Lite (hafif, düşük kota)
-const MODELS = [
-    "gemini-3-flash-preview", 
-    "gemini-2.5-flash",       
-    "gemini-2.5-flash-lite"   
-];
+// --- MODEL SEÇİMİ ---
+// 2026 itibariyle kararlı sürüm: gemini-2.5-flash
+// Eğer 404 alırsan 'gemini-2.5-flash-latest' dene.
+const MODEL_NAME = "gemini-2.5-flash"; 
 
-// Health Check (Aktif modelleri göster)
-app.get('/', (req, res) => res.json({ status: "Online", owner: profileData.user?.name, models: MODELS }));
+// Health Check
+app.get('/', (req, res) => res.json({ status: "Online", owner: "Furkan Senyuz", model: MODEL_NAME }));
 
 // 6. CHAT ROTASI
 app.post('/chat', upload.single('image'), async (req, res) => {
     let imagePath = null;
     let optimizedPath = null;
-    let usedModel = null;  // Kullanılan modeli takip et
 
     try {
         console.log(`📩 Yeni Mesaj: IP ${req.ip}`);
@@ -141,49 +109,31 @@ app.post('/chat', upload.single('image'), async (req, res) => {
             contents[contents.length - 1].parts.push(imagePart);  // Kullanıcı mesajına ekle
         }
 
-        // Fallback Loop: Modelleri sırayla dene
-        let error = null;
-        for (let i = 0; i < MODELS.length; i++) {
-            usedModel = MODELS[i];
-            try {
-                console.log(`🤖 Gemini (${usedModel}) Düşünüyor...`);
-                const response = await genAI.models.generateContent({
-                    model: usedModel,
-                    contents,
-                    generationConfig: { systemInstruction }  // System prompt config'de (JSON ile güncellendi)
-                });
-                const text = response.text;
-                
-                console.log(`✅ Cevap Başarılı (Model: ${usedModel}).`);
-                logUsage(req.ip, usedModel, 'SUCCESS');
-                return res.json({ reply: text, model: usedModel });  // Başarılıysa dön
-            } catch (err) {
-                error = err;
-                console.error(`🚨 Model Hatası (${usedModel}):`, err.message);
-                logUsage(req.ip, usedModel, 'ERROR');
-                
-                // Rate limit (429) veya Not Found (404) ise fallback'e geç
-                if (!err.message.includes("429") && !err.message.includes("404")) {
-                    throw err;  // Diğer hatalar için loop'u kır
-                }
-            }
-        }
+        // Yapay Zekaya Sor (Yeni SDK: generateContent direkt çağrılır, systemInstruction config'de)
+        console.log(`🤖 Gemini (${MODEL_NAME}) Düşünüyor...`);
+        const response = await genAI.models.generateContent({
+            model: MODEL_NAME,
+            contents,
+            generationConfig: { systemInstruction }  // System prompt config'de
+        });
+        const text = response.text;
         
-        // Tüm modeller başarısız olursa hata dön
-        throw error || new Error("Tüm modeller meşgul veya erişilemez.");
+        console.log("✅ Cevap Başarılı.");
+        logUsage(req.ip, MODEL_NAME, 'SUCCESS');
+        res.json({ reply: text, model: MODEL_NAME });
 
     } catch (error) {
         console.error("🚨 SERVER HATASI:", error.message);
-        if (usedModel) logUsage(req.ip, usedModel, 'ERROR');
+        logUsage(req.ip, MODEL_NAME, 'ERROR');
 
         // Hata Detaylarını Analiz Et
         let userReply = "Bağlantıda küçük bir sorun oldu. Lütfen tekrar dene. 🤖";
         
         if (error.message.includes("404") || error.message.includes("Not Found")) {
-            console.error("❌ HATA: Model bulunamadı. Lütfen MODELS dizisini kontrol et.");
+            console.error("❌ HATA: Model bulunamadı. Lütfen server.js içindeki MODEL_NAME değişkenini kontrol et.");
             userReply = "Sistem şu anda bakımda (Model Upgrade). Lütfen daha sonra tekrar dene.";
         } else if (error.message.includes("429")) {
-            userReply = "Kota doldu, biraz bekleyip tekrar dene.";
+            userReply = "Çok fazla istek geldi, biraz bekleyip tekrar dene.";
         }
 
         res.status(500).json({ 
@@ -198,4 +148,4 @@ app.post('/chat', upload.single('image'), async (req, res) => {
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Divine Server ${PORT} portunda çalışıyor! Modeller: ${MODELS.join(', ')}`));
+app.listen(PORT, () => console.log(`🚀 Divine Server ${PORT} portunda çalışıyor! Model: ${MODEL_NAME}`));
