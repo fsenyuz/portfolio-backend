@@ -35,6 +35,20 @@
       "cat": "ai",
       "description": "Prototype computer-vision model that detects PPE (helmet/vest) compliance on construction sites.",
       "stack": ["Python", "Computer Vision"]
+    },
+    {
+      "key": "proj4",
+      "name": "DCC RAG Assistant",
+      "cat": "ai",
+      "description": "Retrieval-Augmented Generation (RAG) assistant built over the project Document Control Center. It lets engineers query technical specifications, drawings, correspondence and contract documents in natural language and returns concise, source-grounded answers with citations to the original documents.",
+      "stack": ["Python", "LLM", "RAG", "Vector Database"]
+    },
+    {
+      "key": "proj5",
+      "name": "Tender Documents Assistant",
+      "cat": "ai",
+      "description": "AI assistant that analyzes and summarizes international tender packages (FIDIC contracts, Bills of Quantities and technical specifications), extracting key requirements, obligations, risks and deadlines to accelerate bid preparation across multiple countries.",
+      "stack": ["Python", "LLM", "NLP", "RAG"]
     }
   ],
   "education": [
