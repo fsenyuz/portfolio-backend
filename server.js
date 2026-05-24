@@ -143,8 +143,10 @@ app.post('/chat', upload.single('image'), async (req, res) => {
 
                 const response = await genAI.models.generateContent({
                     model: modelName,
-                    systemInstruction: systemInstruction,  // String olarak
-                    contents: contents
+                    contents: contents,
+                    config: {
+                        systemInstruction: systemInstruction
+                    }
                 });
 
                 // GÜNCEL: response.text (function değil!)
