@@ -63,7 +63,7 @@ try {
         Profile: portfolioData.profile,
         Experience: portfolioData.experience,
         Education: portfolioData.education,
-        Projects: portfolioData.repos,
+        Projects: portfolioData.projects,
         Locations: portfolioData.locations,
         Skills_Translations: portfolioData.translations
     };

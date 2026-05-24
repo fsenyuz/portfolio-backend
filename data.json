@@ -14,6 +14,29 @@
       "Geotechnical & Structural Engineering"
     ]
   },
+  "projects": [
+    {
+      "key": "proj1",
+      "name": "Delay Claim Prediction Model",
+      "cat": "ai",
+      "description": "Machine learning model that predicts potential delay claims based on daily site reports.",
+      "stack": ["Python", "Machine Learning"]
+    },
+    {
+      "key": "proj2",
+      "name": "BOQ Pricing Automation",
+      "cat": "ai",
+      "description": "Script that automates BOQ (Bill of Quantities) pricing analysis and compares vendor bids.",
+      "stack": ["Python"]
+    },
+    {
+      "key": "proj3",
+      "name": "PPE Compliance Detection",
+      "cat": "ai",
+      "description": "Prototype computer-vision model that detects PPE (helmet/vest) compliance on construction sites.",
+      "stack": ["Python", "Computer Vision"]
+    }
+  ],
   "education": [
     { "key": "edu1", "cat": "ai", "company": "Stanford University (Andrew Ng)", "loc": "Online", "date": "2026 (Expected)", "badge": "https://www.credly.com" },
     { "key": "edu2", "cat": "ai", "company": "University of Michigan", "loc": "Online", "date": "Jan 2026", "badge": "#" },
