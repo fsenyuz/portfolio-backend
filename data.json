@@ -1,4 +1,19 @@
 {
+  "profile": {
+    "fullName": "Furkan Şenyüz",
+    "alsoWrittenAs": ["Furkan Senyuz", "Furkan Senyüz", "F. Şenyüz"],
+    "title": "Civil Engineer & AI Solutions Developer",
+    "website": "fsenyuz.com",
+    "currentRole": "Technical Office Chief at Tasyapi Construction, working on the Kuzmin-Sremska Rača Highway (€345M) in Serbia since 2024.",
+    "summary": "Furkan Şenyüz is a Civil Engineer (BSc, and MSc in Geotechnical Engineering) who has worked on mega infrastructure projects across Europe, including the 1915 Çanakkale Bridge, the Northern Marmara Motorway and the Aydın-Denizli Motorway. He specializes in FIDIC contract management, claims, planning and cost control (Primavera P6, TILOS) and international tendering across 10+ countries. He is also an AI Solutions Developer who applies Machine Learning and Python to automate construction workflows such as delay-claim prediction, BOQ pricing analysis and on-site PPE detection.",
+    "expertise": [
+      "FIDIC Contracts & Claims Management",
+      "Planning & Cost Control (Primavera P6, TILOS)",
+      "International Tendering & Risk Analysis",
+      "Machine Learning & Python automation",
+      "Geotechnical & Structural Engineering"
+    ]
+  },
   "education": [
     { "key": "edu1", "cat": "ai", "company": "Stanford University (Andrew Ng)", "loc": "Online", "date": "2026 (Expected)", "badge": "https://www.credly.com" },
     { "key": "edu2", "cat": "ai", "company": "University of Michigan", "loc": "Online", "date": "Jan 2026", "badge": "#" },

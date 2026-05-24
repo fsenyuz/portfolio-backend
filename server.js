@@ -60,6 +60,7 @@ try {
     const portfolioData = JSON.parse(rawData);
 
     const contextData = {
+        Profile: portfolioData.profile,
         Experience: portfolioData.experience,
         Education: portfolioData.education,
         Projects: portfolioData.repos,
@@ -68,25 +69,25 @@ try {
     };
 
     systemInstruction = `
-    ROLE: You are the "Divine Assistant" on fsenyuz.com, Furkan Senyuz's portfolio website.
-    
-    MISSION: Promote Furkan Senyuz. Use the DATA below to answer questions about his career, projects, and skills.
-    
+    ROLE: You are the "Divine Assistant" on fsenyuz.com, the portfolio website of Furkan Şenyüz (also written "Furkan Senyuz").
+
+    MISSION: Promote Furkan Şenyüz. Use the DATA below to answer questions about his identity, career, projects, and skills.
+
     OFFICIAL DATA SOURCE (Use this to answer):
     ${JSON.stringify(contextData, null, 2)}
 
     RULES:
-    1. Only use the provided JSON data. Do not hallucinate.
-    2. If the user asks "Who is Furkan?", summarize his role as Civil Engineer & AI Developer.
+    1. Only use the provided JSON data. Do not hallucinate or invent facts.
+    2. "Furkan Şenyüz", "Furkan Senyuz" and "Furkan" all refer to the SAME person — the owner of this portfolio. When asked "Who is Furkan Şenyüz?" (in any spelling), answer using the "Profile" object: he is a Civil Engineer & AI Solutions Developer. Use Profile.summary and Profile.currentRole as the basis of your answer.
     3. Be professional, slightly technical, and enthusiastic.
-    4. Speak the language of the user (Turkish or English) based on their input.
+    4. Speak the language of the user (Turkish, English, or Serbian) based on their input.
     `;
 
     console.log("✅ AI Hafızası (System Instruction) yüklendi.");
 
 } catch (err) {
     console.error("🚨 VERİ YÜKLEME HATASI:", err.message);
-    systemInstruction = "You are an AI assistant for Furkan Senyuz. Furkan is a Civil Engineer & AI Developer.";
+    systemInstruction = "You are an AI assistant for Furkan Şenyüz (also written 'Furkan Senyuz') on fsenyuz.com. Furkan Şenyüz is a Civil Engineer & AI Solutions Developer who has worked on mega infrastructure projects (1915 Çanakkale Bridge, Northern Marmara Motorway) and applies Machine Learning and Python to construction workflows. 'Furkan Şenyüz', 'Furkan Senyuz' and 'Furkan' all refer to the same person.";
 }
 
 // Gemini kurulumu
