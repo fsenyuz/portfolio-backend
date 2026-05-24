@@ -1,4 +1,56 @@
 {
+  "profile": {
+    "fullName": "Furkan Şenyüz",
+    "alsoWrittenAs": ["Furkan Senyuz", "Furkan Senyüz", "F. Şenyüz"],
+    "title": "Civil Engineer & AI Solutions Developer",
+    "website": "fsenyuz.com",
+    "currentRole": "Technical Office Chief at Tasyapi Construction, working on the Kuzmin-Sremska Rača Highway (€345M) in Serbia since 2024.",
+    "summary": "Furkan Şenyüz is a Civil Engineer (BSc, and MSc in Geotechnical Engineering) who has worked on mega infrastructure projects across Europe, including the 1915 Çanakkale Bridge, the Northern Marmara Motorway and the Aydın-Denizli Motorway. He specializes in FIDIC contract management, claims, planning and cost control (Primavera P6, TILOS) and international tendering across 10+ countries. He is also an AI Solutions Developer who applies Machine Learning and Python to automate construction workflows such as delay-claim prediction, BOQ pricing analysis and on-site PPE detection.",
+    "expertise": [
+      "FIDIC Contracts & Claims Management",
+      "Planning & Cost Control (Primavera P6, TILOS)",
+      "International Tendering & Risk Analysis",
+      "Machine Learning & Python automation",
+      "Geotechnical & Structural Engineering"
+    ]
+  },
+  "projects": [
+    {
+      "key": "proj1",
+      "name": "Delay Claim Prediction Model",
+      "cat": "ai",
+      "description": "Machine learning model that predicts potential delay claims based on daily site reports.",
+      "stack": ["Python", "Machine Learning"]
+    },
+    {
+      "key": "proj2",
+      "name": "BOQ Pricing Automation",
+      "cat": "ai",
+      "description": "Script that automates BOQ (Bill of Quantities) pricing analysis and compares vendor bids.",
+      "stack": ["Python"]
+    },
+    {
+      "key": "proj3",
+      "name": "PPE Compliance Detection",
+      "cat": "ai",
+      "description": "Prototype computer-vision model that detects PPE (helmet/vest) compliance on construction sites.",
+      "stack": ["Python", "Computer Vision"]
+    },
+    {
+      "key": "proj4",
+      "name": "DCC RAG Assistant",
+      "cat": "ai",
+      "description": "Retrieval-Augmented Generation (RAG) assistant built over the project Document Control Center. It lets engineers query technical specifications, drawings, correspondence and contract documents in natural language and returns concise, source-grounded answers with citations to the original documents.",
+      "stack": ["Python", "LLM", "RAG", "Vector Database"]
+    },
+    {
+      "key": "proj5",
+      "name": "Tender Documents Assistant",
+      "cat": "ai",
+      "description": "AI assistant that analyzes and summarizes international tender packages (FIDIC contracts, Bills of Quantities and technical specifications), extracting key requirements, obligations, risks and deadlines to accelerate bid preparation across multiple countries.",
+      "stack": ["Python", "LLM", "NLP", "RAG"]
+    }
+  ],
   "education": [
     { "key": "edu1", "cat": "ai", "company": "Stanford University (Andrew Ng)", "loc": "Online", "date": "2026 (Expected)", "badge": "https://www.credly.com" },
     { "key": "edu2", "cat": "ai", "company": "University of Michigan", "loc": "Online", "date": "Jan 2026", "badge": "#" },
