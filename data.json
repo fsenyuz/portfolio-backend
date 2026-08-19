@@ -4,8 +4,8 @@
     "alsoWrittenAs": ["Furkan Senyuz", "Furkan Senyüz", "F. Şenyüz"],
     "title": "Civil Engineer & AI Solutions Developer",
     "website": "fsenyuz.com",
-    "currentRole": "Technical Office Chief at Tasyapi Construction, working on the Kuzmin-Sremska Rača Highway (€345M) in Serbia since 2024.",
-    "summary": "Furkan Şenyüz is a Civil Engineer (BSc, and MSc in Geotechnical Engineering) who has worked on mega infrastructure projects across Europe, including the 1915 Çanakkale Bridge, the Northern Marmara Motorway and the Aydın-Denizli Motorway. He specializes in FIDIC contract management, claims, planning and cost control (Primavera P6, TILOS) and international tendering across 10+ countries. He is also an AI Solutions Developer who applies Machine Learning and Python to automate construction workflows such as delay-claim prediction, BOQ pricing analysis and on-site PPE detection.",
+    "currentRole": "Project Management Office Chief at Tasyapi Construction, working on the Kuzmin-Sremska Rača Highway (€345M) in Serbia since 2024.",
+    "summary": "Furkan Şenyüz is a Civil Engineer (BSc) who has worked on mega infrastructure projects across Europe, including the 1915 Çanakkale Bridge, the Northern Marmara Motorway and the Aydın-Denizli Motorway. He specializes in FIDIC contract management, claim-file preparation (EOT and cost claims), planning and cost control (Primavera P6, TILOS) and international tendering across 10+ countries. He is also an AI Solutions Developer who applies Machine Learning and Python to automate construction workflows such as delay-claim prediction, BOQ pricing analysis and on-site PPE detection.",
     "expertise": [
       "FIDIC Contracts & Claims Management",
       "Planning & Cost Control (Primavera P6, TILOS)",
@@ -59,7 +59,7 @@
     { "key": "edu4", "cat": "civil", "company": "Grid Group / TILOS", "loc": "Istanbul", "date": "Feb 2019", "badge": null },
     { "key": "edu5", "cat": "civil", "company": "Akım Mühendislik (Oracle Partner)", "loc": "Istanbul", "date": "Jan 2018", "badge": null },
     { "key": "edu6", "cat": "civil", "company": "Leiden University", "loc": "Online", "date": "Certification", "badge": null },
-    { "key": "edu7", "cat": "civil", "company": "Mugla Sitki Kocman University", "loc": "Turkey", "date": "2016 – Present", "badge": null },
+    { "key": "edu_hsd", "cat": "ai", "company": "Türkiye AI Academy / Huawei Student Developers (HSD)", "loc": "Online", "date": "Aug 2026", "badge": null },
     { "key": "edu8", "cat": "civil", "company": "Mugla Sitki Kocman University", "loc": "Turkey", "date": "2011 – 2016", "badge": null }
   ],
   "experience": [
@@ -122,8 +122,8 @@
       "proj2Desc": "Script automating BOQ pricing analysis, comparing vendor bids.",
       "proj3Desc": "Prototype AI model detecting PPE compliance on construction sites.",
       "viewCode": "View Code",
-      "exp1Title": "Technical Office Chief", "exp1Desc": "<li>Managing full IPC (Interim Payment Certificate) process.</li><li>Developing automated claim management tools using Python.</li>",
-      "exp2Title": "Tendering & PM Specialist", "exp2Desc": "<li>Prepared tenders for infrastructure projects in 10+ countries.</li><li>Managed FIDIC Yellow Book 1999 contract procedures.</li>",
+      "exp1Title": "Project Management Office Chief", "exp1Desc": "<li>Managing full IPC (Interim Payment Certificate) process.</li><li>Developing automated claim management tools using Python.</li><li>Preparing claim files — extension-of-time (EOT) and cost claims with full substantiation.</li>",
+      "exp2Title": "Tendering & PM Specialist", "exp2Desc": "<li>Prepared tenders for infrastructure projects in 10+ countries.</li><li>Managed FIDIC Yellow Book 1999 contract procedures.</li><li>Prepared claim files for FIDIC projects — EOT and cost claims.</li>",
       "exp3Title": "Planning & Cost Control Chief", "exp3Desc": "<li>Created Master Schedule using TILOS; reduced planning conflicts.</li>",
       "exp4Title": "Technical Office Chief", "exp4Desc": "<li>Established technical office standards and led earthworks planning.</li>",
       "exp5Title": "Planning & Cost Engineer", "exp5Desc": "<li>Schedule & cost analysis using Primavera P6.</li>",
@@ -135,7 +135,7 @@
       "edu4Title": "TILOS Linear Project Management", "edu4Desc": "<li>Advanced linear scheduling techniques for infrastructure projects (Highways, Pipelines).</li>",
       "edu5Title": "Oracle Primavera P6 Advanced", "edu5Desc": "<li>Advanced resource management, risk analysis, and progress tracking in Primavera P6.</li>",
       "edu6Title": "The Arbitration of Int. Disputes", "edu6Desc": "<li>International arbitration procedures and dispute resolution frameworks.</li>",
-      "edu7Title": "MSc, Geotechnical Engineering", "edu7Desc": "<li>Thesis focus: Artificial Intelligence applications in Geotechnical Engineering.</li>",
+      "edu_hsdTitle": "Data Science & Machine Learning Bootcamp", "edu_hsdDesc": "<li>3-week bootcamp by Türkiye AI Academy & Huawei Student Developers: Python, data analysis (NumPy, Pandas, Matplotlib) and core ML models, completed with a published final project.</li>",
       "edu8Title": "BSc, Civil Engineering", "edu8Desc": "<li>Graduated as Honor Student with a focus on Structural and Geotechnical courses.</li>"
     },
     "tr": {
@@ -165,8 +165,8 @@
       "proj2Desc": "BOQ (Metraj) analizini otomatize eden Python scripti.",
       "proj3Desc": "Şantiye güvenliği (baret/yelek) için görüntü işleme prototipi.",
       "viewCode": "Kodu Gör",
-      "exp1Title": "Teknik Ofis Şefi", "exp1Desc": "<li>Tüm Hakediş (IPC) süreçlerinin ve sözleşme yönetiminin yürütülmesi.</li><li>Python ile otomatik hak talebi (claim) araçlarının geliştirilmesi.</li>",
-      "exp2Title": "İhale & Proje Yönetim Uzmanı", "exp2Desc": "<li>10+ ülkede altyapı projeleri için ihale hazırlığı.</li><li>FIDIC Yellow Book 1999 sözleşme yönetimi.</li>",
+      "exp1Title": "Proje Yönetim Ofisi Şefi", "exp1Desc": "<li>Tüm Hakediş (IPC) süreçlerinin ve sözleşme yönetiminin yürütülmesi.</li><li>Python ile otomatik hak talebi (claim) araçlarının geliştirilmesi.</li><li>Claim dosyalarının hazırlanması — süre uzatımı (EOT) ve maliyet talepleri.</li>",
+      "exp2Title": "İhale & Proje Yönetim Uzmanı", "exp2Desc": "<li>10+ ülkede altyapı projeleri için ihale hazırlığı.</li><li>FIDIC Yellow Book 1999 sözleşme yönetimi.</li><li>FIDIC projeleri için claim dosyalarının hazırlanması.</li>",
       "exp3Title": "Planlama & Maliyet Kontrol Şefi", "exp3Desc": "<li>TILOS ile Master İş Programının oluşturulması.</li>",
       "exp4Title": "Teknik Ofis Şefi", "exp4Desc": "<li>Teknik ofis standartlarının kurulması ve toprak işleri planlaması.</li>",
       "exp5Title": "Planlama & Maliyet Mühendisi", "exp5Desc": "<li>Primavera P6 ile maliyet ve zaman çizelgesi analizi.</li>",
@@ -178,7 +178,7 @@
       "edu4Title": "TILOS Doğrusal Proje Yönetimi", "edu4Desc": "<li>Altyapı projeleri (Otoyol, Boru Hattı) için ileri düzey doğrusal planlama teknikleri.</li>",
       "edu5Title": "Oracle Primavera P6 İleri Seviye", "edu5Desc": "<li>Primavera P6'da ileri kaynak yönetimi, risk analizi ve ilerleme takibi.</li>",
       "edu6Title": "Uluslararası Tahkim", "edu6Desc": "<li>Uluslararası tahkim prosedürleri ve uyuşmazlık çözüm çerçeveleri.</li>",
-      "edu7Title": "Yüksek Lisans, Geoteknik Mühendisliği", "edu7Desc": "<li>Tez odak noktası: Geoteknik Mühendisliğinde Yapay Zeka uygulamaları.</li>",
+      "edu_hsdTitle": "Veri Bilimi ve Makine Öğrenmesi Bootcamp", "edu_hsdDesc": "<li>Türkiye Yapay Zeka Akademisi & Huawei Student Developers iş birliğiyle 3 haftalık bootcamp: Python, veri analizi (NumPy, Pandas, Matplotlib) ve temel makine öğrenmesi modelleri; yayınlanan final projesiyle tamamlandı.</li>",
       "edu8Title": "Lisans, İnşaat Mühendisliği", "edu8Desc": "<li>Yapı ve Geoteknik derslerine odaklanarak Onur Öğrencisi olarak mezuniyet.</li>"
     },
     "sr": {
@@ -206,8 +206,8 @@
       "proj2Desc": "Python skripta za automatizaciju analize cena (BOQ).",
       "proj3Desc": "Prototip kompjuterskog vida za detekciju zaštitne opreme (PPE).",
       "viewCode": "Pogledaj Kod",
-      "exp1Title": "Šef Tehničke Službe", "exp1Desc": "<li>Upravljanje privremenim situacijama (IPC) i ugovorima.</li><li>Razvoj AI alata za upravljanje odštetnim zahtevima.</li>",
-      "exp2Title": "Specijalista za Tendere", "exp2Desc": "<li>Priprema tendera za projekte u 10+ zemalja.</li><li>Upravljanje FIDIC ugovorima.</li>",
+      "exp1Title": "Šef Kancelarije za Upravljanje Projektima", "exp1Desc": "<li>Upravljanje privremenim situacijama (IPC) i ugovorima.</li><li>Razvoj AI alata za upravljanje odštetnim zahtevima.</li><li>Priprema odštetnih zahteva (claim) — produženje rokova (EOT) i troškovni zahtevi.</li>",
+      "exp2Title": "Specijalista za Tendere", "exp2Desc": "<li>Priprema tendera za projekte u 10+ zemalja.</li><li>Upravljanje FIDIC ugovorima.</li><li>Priprema odštetnih zahteva za FIDIC projekte.</li>",
       "exp3Title": "Šef Planiranja i Kontrole", "exp3Desc": "<li>Izrada Master Plana u TILOS-u.</li>",
       "exp4Title": "Šef Tehničke Službe", "exp4Desc": "<li>Uspostavljanje standarda tehničke službe.</li>",
       "exp5Title": "Inženjer Planiranja", "exp5Desc": "<li>Analiza troškova i vremena u Primavera P6.</li>",
@@ -219,7 +219,7 @@
       "edu4Title": "TILOS Linearno Planiranje", "edu4Desc": "<li>Napredne tehnike linearnog planiranja za infrastrukturne projekte (Autoputevi).</li>",
       "edu5Title": "Oracle Primavera P6 Napredni", "edu5Desc": "<li>Napredno upravljanje resursima i analiza rizika u Primavera P6.</li>",
       "edu6Title": "Međunarodna Arbitraža", "edu6Desc": "<li>Postupci međunarodne arbitraže i rešavanje sporova.</li>",
-      "edu7Title": "Master, Geotehnika", "edu7Desc": "<li>Fokus teze: Primena veštačke inteligencije u geotehničkom inženjerstvu.</li>",
+      "edu_hsdTitle": "Bootcamp — Nauka o Podacima i Mašinsko Učenje", "edu_hsdDesc": "<li>Trosedmični bootcamp (Türkiye AI Academy & Huawei Student Developers): Python, analiza podataka (NumPy, Pandas, Matplotlib) i osnovni ML modeli; završen objavljenim finalnim projektom.</li>",
       "edu8Title": "Dipl. Građevinski Inženjer", "edu8Desc": "<li>Diplomirao kao počasni student sa fokusom na strukturalne i geotehničke kurseve.</li>"
     }
   }
