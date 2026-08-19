@@ -6,8 +6,8 @@
       "Furkan Senyüz",
       "F. Şenyüz"
     ],
-    "title": "Civil Engineer & AI Solutions Developer",
-    "website": "fsenyuz.com",
+    "title": "Civil Engineer & AI Engineer",
+    "website": "furkansenyuz.com",
     "currentRole": "Project Management Office Chief at Tasyapi Construction, working on the Kuzmin-Sremska Rača Highway (€345M) in Serbia since 2024.",
     "summary": "Furkan Şenyüz is a Civil Engineer (BSc) who has worked on mega infrastructure projects across Europe, including the 1915 Çanakkale Bridge, the Northern Marmara Motorway and the Aydın-Denizli Motorway. He specializes in FIDIC contract management, claim-file preparation (EOT and cost claims), planning and cost control (Primavera P6, TILOS) and international tendering across 10+ countries. He is also an AI Solutions Developer who applies Machine Learning and Python to automate construction workflows such as invoice auditing, IPC/RFI checks, tender-dossier analysis and BOQ pricing.",
     "expertise": [
@@ -366,7 +366,7 @@
   "translations": {
     "en": {
       "contactBtn": "Let's Connect",
-      "heroTitle": "Civil Engineer & AI Solutions Developer",
+      "heroTitle": "Civil Engineer & AI Engineer",
       "heroSlogan": "Building the Future with <br> Concrete & Code",
       "installBtn": "Install App",
       "filterAll": "All",
@@ -439,7 +439,7 @@
     },
     "tr": {
       "contactBtn": "İletişime Geç",
-      "heroTitle": "İnşaat Mühendisi & Yapay Zeka Geliştirici",
+      "heroTitle": "İnşaat Mühendisi & Yapay Zekâ Mühendisi",
       "heroSlogan": "Geleceği Beton ve Kod ile <br> İnşa Ediyorum",
       "installBtn": "Uygulamayı Yükle",
       "filterAll": "Tümü",
@@ -512,7 +512,7 @@
     },
     "sr": {
       "contactBtn": "Kontaktirajte Me",
-      "heroTitle": "Građevinski Inženjer & AI Developer",
+      "heroTitle": "Građevinski Inženjer & AI Inženjer",
       "heroSlogan": "Gradimo Budućnost <br> Betonom i Kodom",
       "installBtn": "Instaliraj Aplikaciju",
       "filterAll": "Sve",
